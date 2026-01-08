@@ -100,7 +100,17 @@ streamlit run web/app.py
 ### 5. Worker 실행
 
 ```bash
-python -m worker.main
+# 전체 파이프라인 실행
+python worker/run_pipeline.py --mode=all
+
+# 개별 모드 실행
+python worker/run_pipeline.py --mode=collect          # Reddit + SERP AIO 수집
+python worker/run_pipeline.py --mode=ingest_gsc --gsc-csv data/gsc_data.csv  # GSC CSV 업로드
+python worker/run_pipeline.py --mode=analyze          # 정제/임베딩/클러스터링
+python worker/run_pipeline.py --mode=label            # LLM 기반 brief 생성
+
+# Dry run (DB 쓰기 없이 테스트)
+python worker/run_pipeline.py --mode=all --dry-run
 ```
 
 ## 주의사항

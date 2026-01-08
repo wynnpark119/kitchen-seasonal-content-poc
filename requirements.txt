@@ -8,9 +8,10 @@ plotly>=5.17.0
 psycopg2-binary>=2.9.9
 sqlalchemy>=2.0.0
 
-# Data Collection (추후 추가 예정)
-# praw>=7.7.0  # Reddit API
-# google-api-python-client>=2.100.0  # Google APIs
+# Data Collection
+apify-client>=1.0.0  # Apify for Reddit
+google-search-results>=2.4.2  # SerpAPI
+openai>=1.0.0  # OpenAI API for embeddings and LLM
 
 # Utilities
 python-dotenv>=1.0.0
@@ -20,3 +21,7 @@ pydantic-settings>=2.0.0
 # Worker (스케줄링 등)
 # schedule>=1.2.0
 # celery>=5.3.0  # 선택사항
+
+# Machine Learning
+hdbscan>=0.8.33  # HDBSCAN clustering
+scikit-learn>=1.3.0  # TF-IDF, utilities
