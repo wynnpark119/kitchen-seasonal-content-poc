@@ -19,8 +19,8 @@ COPY . .
 RUN mkdir -p .streamlit
 COPY .streamlit/config.toml .streamlit/config.toml 2>/dev/null || true
 
-# 포트 노출
+# 포트 노출 (Railway는 동적으로 포트를 할당하므로 일반적인 포트 사용)
 EXPOSE 8501
 
-# Streamlit 실행
+# Streamlit 실행 (Railway의 startCommand가 우선되지만, 기본값으로 설정)
 CMD ["streamlit", "run", "web/app.py", "--server.port=8501", "--server.address=0.0.0.0"]
