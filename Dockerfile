@@ -15,9 +15,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 프로젝트 코드 복사
 COPY . .
 
-# Streamlit 설정
+# Streamlit 설정 (이미 COPY . . 에서 복사됨)
 RUN mkdir -p .streamlit
-COPY .streamlit/config.toml .streamlit/config.toml 2>/dev/null || true
 
 # 포트 노출 (Railway는 동적으로 포트를 할당하므로 일반적인 포트 사용)
 EXPOSE 8501
