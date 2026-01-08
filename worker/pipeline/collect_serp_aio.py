@@ -14,7 +14,9 @@ logger = setup_logger("collect_serp_aio")
 def collect_serp_aio(run_id: int, dry_run: bool = False) -> Dict[str, Any]:
     """Collect SERP AI Overview snapshots via SerpAPI"""
     serpapi_key = os.getenv("SERPAPI_KEY")
-    if not serpapi_key:
+    
+    # In dry-run mode, skip key check
+    if not dry_run and not serpapi_key:
         raise ValueError("SERPAPI_KEY not found in environment variables")
     
     stats = {

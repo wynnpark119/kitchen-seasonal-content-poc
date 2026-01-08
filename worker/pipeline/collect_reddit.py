@@ -26,15 +26,19 @@ def collect_reddit_data(run_id: int, dry_run: bool = False) -> Dict[str, Any]:
     # MCP integration can be added later if needed for direct MCP tool calls
     apify_token = os.getenv("APIFY_TOKEN")
     
-    if not apify_token:
+    # In dry-run mode, skip token check
+    if not dry_run and not apify_token:
         raise ValueError("APIFY_TOKEN not found in environment variables. "
                         "Note: MCP is connected, but ApifyClient still requires APIFY_TOKEN for direct API calls.")
     
-    try:
-        from apify_client import ApifyClient
-        client = ApifyClient(apify_token)
-    except ImportError:
-        raise ImportError("apify-client not installed. Install with: pip install apify-client")
+    # Only initialize client if not in dry-run mode
+    client = None
+    if not dry_run:
+        try:
+            from apify_client import ApifyClient
+            client = ApifyClient(apify_token)
+        except ImportError:
+            raise ImportError("apify-client not installed. Install with: pip install apify-client")
     
     stats = {
         "posts_collected": 0,
@@ -58,6 +62,9 @@ def collect_reddit_data(run_id: int, dry_run: bool = False) -> Dict[str, Any]:
                 logger.info(f"[DRY RUN] Would collect up to {MAX_POSTS_PER_KEYWORD} posts for '{keyword}'")
                 stats["keywords_processed"] += 1
                 continue
+            
+            if not client:
+                raise ValueError("ApifyClient not initialized")
             
             # Run Apify actor for Reddit search
             # Recommended Actor: harshmaur/reddit-scraper (MCP compatible, pay-per-result)
