@@ -85,16 +85,21 @@ with tab0:
     
     # DATABASE_URL 확인
     import os
-    database_url = os.getenv("DATABASE_URL") or os.getenv("RAILWAY_DATABASE_URL")
+    database_url = (
+        os.getenv("DATABASE_URL") or 
+        os.getenv("RAILWAY_DATABASE_URL") or 
+        os.getenv("POSTGRES_URL") or
+        os.getenv("POSTGRES_PRIVATE_URL")
+    )
     if not database_url:
-        st.error("⚠️ DATABASE_URL 환경 변수가 설정되지 않았습니다.")
+        st.warning("⚠️ DATABASE_URL 환경 변수가 설정되지 않았습니다.")
         st.info("""
         Railway에서 PostgreSQL 서비스를 추가하고 연결하세요:
         1. Railway 대시보드 → 프로젝트 → "New" → "Database" → "PostgreSQL"
         2. PostgreSQL 서비스가 생성되면 DATABASE_URL이 자동으로 설정됩니다
         3. Streamlit 서비스의 "Variables" 탭에서 DATABASE_URL 확인
         """)
-        st.stop()
+        # st.stop() 제거 - 대시보드가 로드되도록 함
     
     try:
         overview = get_executive_overview()
