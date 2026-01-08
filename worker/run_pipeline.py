@@ -2,24 +2,46 @@
 """
 Pipeline entry point: End-to-end data collection, processing, and analysis
 
-Usage:
-    python run_pipeline.py --mode=all
-    python run_pipeline.py --mode=collect
-    python run_pipeline.py --mode=ingest_gsc --gsc-csv path/to/file.csv
-    python run_pipeline.py --mode=analyze
-    python run_pipeline.py --mode=label
-    python run_pipeline.py --mode=all --dry-run
+이 파이프라인은 Reddit, Google SERP AI Overview, Google Search Console 데이터를
+수집하고 분석하여 키친 라이프스타일 콘텐츠 주제를 발굴합니다.
+
+실행 예시:
+    # 전체 파이프라인 실행
+    python worker/run_pipeline.py --mode=all
+    
+    # 개별 모드 실행
+    python worker/run_pipeline.py --mode=collect
+    python worker/run_pipeline.py --mode=ingest_gsc --gsc-csv data/gsc_2024.csv
+    python worker/run_pipeline.py --mode=analyze
+    python worker/run_pipeline.py --mode=label
+    
+    # Dry run (DB 쓰기 없이 테스트)
+    python worker/run_pipeline.py --mode=all --dry-run
+    
+    # 특정 단계만 실행
+    python worker/run_pipeline.py --mode=collect --dry-run
 
 Execution modes:
-    --mode=collect       Reddit + SERP AIO collection/ingestion
-    --mode=ingest_gsc    GSC CSV loading/ingestion
-    --mode=analyze       Preprocessing/embedding/clustering/keywords/timeseries
-    --mode=label         LLM-based cluster labeling and brief generation
-    --mode=all           Full pipeline execution
+    --mode=collect       Reddit 수집 + SERP AIO 1회 스냅샷 수집
+    --mode=ingest_gsc     GSC CSV 로딩 및 적재 (--gsc-csv 필수)
+    --mode=analyze        정제/임베딩/클러스터링/특징어/시계열 생성
+    --mode=label          클러스터 단위 LLM 해석 및 topic_qa_briefs 생성
+    --mode=all            collect → ingest_gsc → analyze → label 전체 실행
 
 Options:
-    --dry-run           Dry run mode (no DB writes, sample output only)
-    --gsc-csv PATH      Path to GSC CSV file (required for ingest_gsc mode)
+    --dry-run           Dry run 모드 (DB 쓰기 없이 처리량/샘플만 로그 출력)
+    --gsc-csv PATH      GSC CSV 파일 경로 (ingest_gsc 모드 필수)
+
+환경 변수:
+    DATABASE_URL        PostgreSQL 연결 URL
+    OPENAI_API_KEY      OpenAI API 키 (임베딩 및 LLM)
+    APIFY_TOKEN         Apify API 토큰 (Reddit 수집)
+    SERPAPI_KEY         SerpAPI 키 (SERP AIO 수집)
+
+재실행 안정성:
+    - 모든 쓰기 작업은 upsert/unique key 기반 처리
+    - 동일 run_id로 재실행해도 중복 생성되지 않음
+    - pipeline_runs 테이블에 실행 상태/에러/처리 건수 기록
 """
 import argparse
 import sys
@@ -179,13 +201,20 @@ def main():
             
             all_stats = {}
             
-            # Collect
+            # Collect (Reddit + SERP AIO)
             all_stats["collect"] = run_collect_mode(run_id, args.dry_run)
             
-            # Analyze
+            # Ingest GSC (if CSV path provided)
+            if args.gsc_csv:
+                all_stats["ingest_gsc"] = run_ingest_gsc_mode(run_id, args.gsc_csv, args.dry_run)
+            else:
+                logger.warning("GSC CSV path not provided, skipping GSC ingestion")
+                all_stats["ingest_gsc"] = {"skipped": True, "message": "No --gsc-csv provided"}
+            
+            # Analyze (정제/임베딩/클러스터링/시계열)
             all_stats["analyze"] = run_analyze_mode(run_id, args.dry_run)
             
-            # Label
+            # Label (LLM 기반 brief 생성)
             all_stats["label"] = run_label_mode(run_id, args.dry_run)
             
             stats = all_stats
