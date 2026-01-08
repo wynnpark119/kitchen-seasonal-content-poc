@@ -3,8 +3,9 @@
 -- Version: 1.0
 -- Created: 2025-01-08
 
--- Enable pgvector extension for embedding storage
-CREATE EXTENSION IF NOT EXISTS vector;
+-- Note: pgvector extension is not available on Railway PostgreSQL
+-- Using JSONB for embedding storage instead
+-- CREATE EXTENSION IF NOT EXISTS vector;
 
 -- ============================================================================
 -- Pipeline Management
@@ -120,13 +121,13 @@ CREATE INDEX idx_raw_gsc_queries_impressions ON raw_gsc_queries(impressions DESC
 -- Analysis Tables
 -- ============================================================================
 
--- Embeddings
+-- Embeddings (using JSONB instead of pgvector)
 CREATE TABLE embeddings (
     id SERIAL PRIMARY KEY,
     doc_type VARCHAR(50) NOT NULL, -- 'reddit_post', 'reddit_comment', etc.
     doc_id VARCHAR(100) NOT NULL, -- References the source document ID
     text_hash VARCHAR(64) NOT NULL, -- SHA-256 hash of the text for deduplication
-    embedding vector(384), -- Using all-MiniLM-L6-v2 default dimension (384)
+    embedding_json JSONB NOT NULL, -- Array of floats [0.123, 0.456, ...] for all-MiniLM-L6-v2 (384 dimensions)
     model_name VARCHAR(100) NOT NULL DEFAULT 'all-MiniLM-L6-v2',
     dim INTEGER NOT NULL DEFAULT 384,
     created_from_run_id INTEGER NOT NULL,
@@ -139,8 +140,8 @@ CREATE TABLE embeddings (
 
 CREATE INDEX idx_embeddings_doc_type_id ON embeddings(doc_type, doc_id);
 CREATE INDEX idx_embeddings_run_id ON embeddings(created_from_run_id);
--- Vector similarity search index (using HNSW for performance)
-CREATE INDEX idx_embeddings_vector ON embeddings USING hnsw (embedding vector_cosine_ops);
+-- GIN index for JSONB queries
+CREATE INDEX idx_embeddings_json ON embeddings USING gin (embedding_json);
 
 -- Clusters
 CREATE TABLE clusters (
@@ -300,5 +301,5 @@ COMMENT ON TABLE topic_qa_briefs IS 'LLM-generated Q&A briefs for content planni
 
 COMMENT ON COLUMN raw_gsc_queries.date_month IS 'YYYY-MM-01 format for monthly aggregation';
 COMMENT ON COLUMN cluster_timeseries.month IS 'YYYY-MM-01 format for monthly time series';
-COMMENT ON COLUMN embeddings.embedding IS 'Vector embedding using pgvector extension (384 dimensions for all-MiniLM-L6-v2)';
+COMMENT ON COLUMN embeddings.embedding_json IS 'Vector embedding stored as JSONB array of floats (384 dimensions for all-MiniLM-L6-v2)';
 COMMENT ON COLUMN topic_qa_briefs.category IS 'One of 4 main topics: SPRING_RECIPES, SPRING_KITCHEN_STYLING, REFRIGERATOR_ORGANIZATION, VEGETABLE_PREP_HANDLING';
