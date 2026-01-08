@@ -1,6 +1,6 @@
 [server]
 headless = true
-port = 8501
+# port는 Railway의 PORT 환경 변수를 사용 (설정하지 않음)
 enableCORS = false
 enableXsrfProtection = false
 

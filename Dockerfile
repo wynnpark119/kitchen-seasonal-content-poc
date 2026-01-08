@@ -22,5 +22,5 @@ RUN mkdir -p .streamlit
 EXPOSE 8501
 
 # Streamlit 실행 (Railway의 startCommand가 우선되지만, 기본값으로 설정)
-# Railway는 PORT 환경 변수를 자동으로 설정하므로, startCommand에서 처리
-CMD ["sh", "-c", "streamlit run web/app.py --server.port=${PORT:-8501} --server.address=0.0.0.0"]
+# Streamlit은 PORT 환경 변수를 자동으로 읽으므로 명시적으로 지정하지 않음
+CMD ["streamlit", "run", "web/app.py", "--server.address=0.0.0.0"]
