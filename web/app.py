@@ -36,7 +36,18 @@ if env_path.exists():
 
 # 환경 변수 로드
 from common.config import DATABASE_URL
-from common.openai_client import is_openai_available
+from common.openai_client import is_openai_available, load_openai_api_key
+
+# 디버깅: OpenAI API 키 상태 확인
+if not is_openai_available():
+    api_key = load_openai_api_key()
+    if api_key:
+        print(f"⚠️ API 키는 로드되었지만 is_openai_available()이 False를 반환합니다. 키 길이: {len(api_key)}")
+    else:
+        print("⚠️ OpenAI API 키가 로드되지 않았습니다.")
+        print(f"환경 변수 OPENAI_API_KEY: {os.getenv('OPENAI_API_KEY', 'NOT SET')[:20]}...")
+else:
+    print("✅ OpenAI API 키가 정상적으로 로드되었습니다.")
 
 # 뷰 임포트
 from web.views.clustering_results import render_clustering_results
