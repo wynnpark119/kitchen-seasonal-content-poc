@@ -1,5 +1,6 @@
 .env
 data/
+!data/master_topics.json
 __pycache__/
 *.pyc
 .streamlit/*.log
