@@ -105,11 +105,21 @@ def is_openai_available() -> bool:
             _api_key = load_openai_api_key()
         # API 키가 있고 비어있지 않은지 확인
         if _api_key is None:
+            print("⚠️ OpenAI API 키가 로드되지 않았습니다.")
             return False
         api_key_stripped = _api_key.strip()
-        return len(api_key_stripped) > 0
+        if len(api_key_stripped) == 0:
+            print("⚠️ OpenAI API 키가 비어있습니다.")
+            return False
+        if api_key_stripped == "your_openai_api_key":
+            print("⚠️ OpenAI API 키가 기본값입니다. 환경 변수를 확인하세요.")
+            return False
+        print(f"✅ OpenAI API 키 로드 성공 (길이: {len(api_key_stripped)})")
+        return True
     except Exception as e:
-        # 디버깅을 위해 예외 정보 출력 (선택사항)
+        # 디버깅을 위해 예외 정보 출력
         import sys
-        print(f"Warning: is_openai_available() error: {e}", file=sys.stderr)
+        print(f"❌ is_openai_available() error: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
         return False
