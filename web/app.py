@@ -15,12 +15,12 @@ import os
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-# .env 파일 명시적으로 로드 (OpenAI API 키 등)
+# .env 파일 명시적으로 로드 (로컬 개발용, Railway에서는 환경 변수 사용)
 env_path = project_root / ".env"
 if env_path.exists():
     try:
         from dotenv import load_dotenv
-        load_dotenv(dotenv_path=env_path, override=True)
+        load_dotenv(dotenv_path=env_path, override=False)  # override=False: 환경 변수가 우선
     except ImportError:
         # dotenv가 없으면 직접 읽기
         with open(env_path, 'r', encoding='utf-8') as f:
@@ -30,7 +30,8 @@ if env_path.exists():
                     key, value = line.split('=', 1)
                     key = key.strip()
                     value = value.strip().strip('"').strip("'")
-                    if key and value:
+                    # 환경 변수가 이미 설정되어 있지 않을 때만 설정
+                    if key and value and not os.getenv(key):
                         os.environ[key] = value
 
 # 환경 변수 로드

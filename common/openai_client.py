@@ -23,12 +23,12 @@ def load_openai_api_key() -> Optional[str]:
     Returns:
         API 키 문자열 또는 None
     """
-    # 1순위: 환경변수
+    # 1순위: 환경변수 (Railway 등 배포 환경에서 사용)
     api_key = os.getenv("OPENAI_API_KEY")
-    if api_key:
+    if api_key and api_key.strip() and api_key != "your_openai_api_key":
         return api_key.strip()
     
-    # 2순위: .env 파일
+    # 2순위: .env 파일 (로컬 개발용)
     project_root = Path(__file__).parent.parent
     env_path = project_root / ".env"
     
@@ -36,10 +36,10 @@ def load_openai_api_key() -> Optional[str]:
     try:
         from dotenv import load_dotenv
         if env_path.exists():
-            # override=True로 설정하여 .env 파일의 값을 환경 변수에 설정
-            load_dotenv(dotenv_path=env_path, override=True)
+            # override=False: 환경 변수가 이미 있으면 덮어쓰지 않음
+            load_dotenv(dotenv_path=env_path, override=False)
             api_key = os.getenv("OPENAI_API_KEY")
-            if api_key:
+            if api_key and api_key.strip() and api_key != "your_openai_api_key":
                 return api_key.strip()
     except ImportError:
         # dotenv가 없으면 .env 파일을 직접 읽기
@@ -51,7 +51,7 @@ def load_openai_api_key() -> Optional[str]:
                         key, value = line.split('=', 1)
                         key = key.strip()
                         value = value.strip().strip('"').strip("'")
-                        if key == "OPENAI_API_KEY" and value:
+                        if key == "OPENAI_API_KEY" and value and value != "your_openai_api_key":
                             # 환경 변수에 직접 설정
                             os.environ["OPENAI_API_KEY"] = value
                             return value
