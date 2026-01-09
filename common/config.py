@@ -4,11 +4,27 @@
 """
 import os
 from pathlib import Path
-from dotenv import load_dotenv
 
-# .env 파일 로드
-env_path = Path(__file__).parent.parent / ".env"
-load_dotenv(dotenv_path=env_path)
+# .env 파일 로드 (dotenv가 없어도 동작하도록 fallback 제공)
+try:
+    from dotenv import load_dotenv
+    env_path = Path(__file__).parent.parent / ".env"
+    if env_path.exists():
+        load_dotenv(dotenv_path=env_path, override=False)
+except ImportError:
+    # dotenv가 없으면 .env 파일을 직접 읽기
+    env_path = Path(__file__).parent.parent / ".env"
+    if env_path.exists():
+        with open(env_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    key = key.strip()
+                    value = value.strip().strip('"').strip("'")
+                    # 이미 환경 변수가 설정되어 있지 않을 때만 설정
+                    if key and not os.getenv(key):
+                        os.environ[key] = value
 
 # Database 설정 (worker/pipeline/db.py와 동일한 순서로 읽기)
 DATABASE_URL = (
