@@ -10,8 +10,13 @@ from dotenv import load_dotenv
 env_path = Path(__file__).parent.parent / ".env"
 load_dotenv(dotenv_path=env_path)
 
-# Database 설정
-DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("RAILWAY_DATABASE_URL")
+# Database 설정 (worker/pipeline/db.py와 동일한 순서로 읽기)
+DATABASE_URL = (
+    os.getenv("DATABASE_URL") or 
+    os.getenv("RAILWAY_DATABASE_URL") or
+    os.getenv("POSTGRES_URL") or
+    os.getenv("POSTGRES_PRIVATE_URL")
+)
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = int(os.getenv("DB_PORT", 5432))
 DB_NAME = os.getenv("DB_NAME", "kitchen_seasonal_db")
