@@ -29,19 +29,20 @@ def load_openai_api_key() -> Optional[str]:
         return api_key.strip()
     
     # 2순위: .env 파일
+    project_root = Path(__file__).parent.parent
+    env_path = project_root / ".env"
+    
+    # dotenv를 사용하여 .env 파일 로드
     try:
         from dotenv import load_dotenv
-        project_root = Path(__file__).parent.parent
-        env_path = project_root / ".env"
         if env_path.exists():
-            load_dotenv(dotenv_path=env_path, override=False)
+            # override=True로 설정하여 .env 파일의 값을 환경 변수에 설정
+            load_dotenv(dotenv_path=env_path, override=True)
             api_key = os.getenv("OPENAI_API_KEY")
             if api_key:
                 return api_key.strip()
     except ImportError:
         # dotenv가 없으면 .env 파일을 직접 읽기
-        project_root = Path(__file__).parent.parent
-        env_path = project_root / ".env"
         if env_path.exists():
             with open(env_path, 'r', encoding='utf-8') as f:
                 for line in f:
@@ -51,6 +52,8 @@ def load_openai_api_key() -> Optional[str]:
                         key = key.strip()
                         value = value.strip().strip('"').strip("'")
                         if key == "OPENAI_API_KEY" and value:
+                            # 환경 변수에 직접 설정
+                            os.environ["OPENAI_API_KEY"] = value
                             return value
     
     return None
@@ -96,9 +99,17 @@ def reset_client():
 
 def is_openai_available() -> bool:
     """OpenAI API 키가 사용 가능한지 확인"""
+    global _api_key
     try:
         if _api_key is None:
             _api_key = load_openai_api_key()
-        return _api_key is not None and len(_api_key.strip()) > 0
-    except Exception:
+        # API 키가 있고 비어있지 않은지 확인
+        if _api_key is None:
+            return False
+        api_key_stripped = _api_key.strip()
+        return len(api_key_stripped) > 0
+    except Exception as e:
+        # 디버깅을 위해 예외 정보 출력 (선택사항)
+        import sys
+        print(f"Warning: is_openai_available() error: {e}", file=sys.stderr)
         return False

@@ -11,8 +11,27 @@ from pathlib import Path
 
 # 프로젝트 루트를 Python 경로에 추가
 import sys
+import os
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
+
+# .env 파일 명시적으로 로드 (OpenAI API 키 등)
+env_path = project_root / ".env"
+if env_path.exists():
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(dotenv_path=env_path, override=True)
+    except ImportError:
+        # dotenv가 없으면 직접 읽기
+        with open(env_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    key = key.strip()
+                    value = value.strip().strip('"').strip("'")
+                    if key and value:
+                        os.environ[key] = value
 
 # 환경 변수 로드
 from common.config import DATABASE_URL

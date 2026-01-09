@@ -414,7 +414,6 @@ def get_clustering_results_from_db() -> pd.DataFrame:
                 c.cluster_id,
                 c.size,
                 c.algorithm,
-                c.summary,
                 c.topic_category,
                 c.sub_cluster_index,
                 c.top_keywords,
@@ -438,7 +437,7 @@ def get_clustering_results_from_db() -> pd.DataFrame:
             FROM clusters c
             LEFT JOIN cluster_assignments ca ON c.cluster_id = ca.cluster_id
             WHERE c.noise_label = FALSE
-            GROUP BY c.cluster_id, c.size, c.algorithm, c.summary, c.topic_category, c.sub_cluster_index, c.top_keywords
+            GROUP BY c.cluster_id, c.size, c.algorithm, c.topic_category, c.sub_cluster_index, c.top_keywords
             ORDER BY c.topic_category, c.sub_cluster_index, c.size DESC
         """
         df = pd.read_sql_query(query, conn)
@@ -512,7 +511,6 @@ def get_clusters_with_trends() -> pd.DataFrame:
             c.cluster_id,
             c.size,
             c.algorithm,
-            c.summary,
             c.topic_category,
             c.sub_cluster_index,
             c.top_keywords,
@@ -529,7 +527,7 @@ def get_clusters_with_trends() -> pd.DataFrame:
         FROM clusters c
         LEFT JOIN cluster_assignments ca ON c.cluster_id = ca.cluster_id
         WHERE c.noise_label = FALSE
-        GROUP BY c.cluster_id, c.size, c.algorithm, c.summary, c.topic_category, c.sub_cluster_index, c.top_keywords, c.monthly_trend_summary, c.representative_posts_summary
+        GROUP BY c.cluster_id, c.size, c.algorithm, c.topic_category, c.sub_cluster_index, c.top_keywords, c.monthly_trend_summary, c.representative_posts_summary
         ORDER BY c.size DESC
     """
     return query_to_dataframe(query)
@@ -821,7 +819,6 @@ def get_reddit_clustering_for_master_topic(topic_category: str) -> List[Dict[str
                     c.sub_cluster_index,
                     c.size as cluster_size,
                     c.top_keywords,
-                    c.summary,
                     -- 대표 포스트 요약 (상위 3개 포스트의 제목과 본문 일부)
                     COALESCE(
                         jsonb_agg(
@@ -838,7 +835,7 @@ def get_reddit_clustering_for_master_topic(topic_category: str) -> List[Dict[str
                 LEFT JOIN raw_reddit_posts rp ON ca.doc_id = rp.reddit_post_id
                 WHERE c.noise_label = FALSE
                 AND c.topic_category = %s
-                GROUP BY c.cluster_id, c.topic_category, c.sub_cluster_index, c.size, c.top_keywords, c.summary
+                GROUP BY c.cluster_id, c.topic_category, c.sub_cluster_index, c.size, c.top_keywords
                 ORDER BY c.sub_cluster_index, c.size DESC
             """
             cur.execute(query, (topic_category,))
@@ -848,7 +845,7 @@ def get_reddit_clustering_for_master_topic(topic_category: str) -> List[Dict[str
             
             clusters = []
             for row in results:
-                cluster_id, topic_cat, sub_idx, size, top_keywords, summary, rep_posts = row
+                cluster_id, topic_cat, sub_idx, size, top_keywords, rep_posts = row
                 
                 # top_keywords를 리스트로 변환
                 keywords_list = []
@@ -880,7 +877,7 @@ def get_reddit_clustering_for_master_topic(topic_category: str) -> List[Dict[str
                     'sub_cluster_id': sub_idx,
                     'cluster_size': size,
                     'top_keywords': keywords_list[:20] if keywords_list else [],  # 상위 20개만
-                    'summary': summary,
+                    'summary': None,  # DB summary 제거, GPT 요약만 사용
                     'representative_posts': posts_list[:3] if posts_list else []  # 상위 3개만
                 })
             
