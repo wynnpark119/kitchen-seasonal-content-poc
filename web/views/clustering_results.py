@@ -72,13 +72,7 @@ def render_clustering_results():
                     with col4:
                         st.metric("Representative", int(cluster_row.get('representative_count', 0)))
                     
-                    # 요약 표시
-                    summary = cluster_row.get('summary')
-                    if pd.notna(summary) and summary:
-                        st.markdown("**📝 요약:**")
-                        st.info(summary)
-                    
-                    # GPT 요약 (선택적, 실패해도 화면 깨지지 않음)
+                    # GPT 요약 표시 (DB의 summary는 제거하고 GPT 요약만 표시)
                     try:
                         if is_openai_available():
                             with st.spinner("GPT로 클러스터 요약 생성 중..."):
@@ -89,11 +83,17 @@ def render_clustering_results():
                                     topic_category_display if topic_category_display != 'Unknown' else 'Unknown'
                                 )
                                 if gpt_summary:
-                                    st.markdown("**📝 요약 (GPT 생성):**")
+                                    st.markdown("**📝 요약:**")
                                     st.info(gpt_summary)
+                                else:
+                                    st.info("요약을 생성할 수 없습니다.")
+                        else:
+                            st.warning("⚠️ OpenAI API 키가 설정되지 않아 GPT 요약을 생성할 수 없습니다.")
                     except Exception as gpt_error:
-                        # GPT 실패해도 계속 진행
-                        pass
+                        # GPT 실패 시 에러 메시지 표시
+                        st.error(f"GPT 요약 생성 중 오류가 발생했습니다: {gpt_error}")
+                        import traceback
+                        st.code(traceback.format_exc())
                     
                     # Top Keywords
                     if top_keywords:
