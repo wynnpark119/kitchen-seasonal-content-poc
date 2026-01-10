@@ -147,8 +147,16 @@ class ClusteringService:
             # JSON 파일이 없으면 DB에서 조회 (Fallback)
             print("⚠️ JSON 파일이 없어 DB에서 카테고리별 통계를 조회합니다.")
             try:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.info("Attempting to load category overview from database...")
+                
                 df_all = get_clustering_results_from_db()
+                logger.info(f"DB query returned {len(df_all)} clusters")
+                
                 if len(df_all) == 0:
+                    logger.warning("No clusters found in database")
+                    print("⚠️ DB에 클러스터 데이터가 없습니다.")
                     return pd.DataFrame()
                 
                 # 카테고리별 집계
@@ -157,8 +165,12 @@ class ClusteringService:
                 
                 for _, row in df_all.iterrows():
                     category = row.get('topic_category', 'UNKNOWN')
+                    if pd.isna(category):
+                        category = 'UNKNOWN'
                     category_stats[category]['clusters'] += 1
-                    category_stats[category]['posts'] += row.get('size', 0)
+                    size = row.get('size', 0)
+                    if pd.notna(size):
+                        category_stats[category]['posts'] += int(size)
                 
                 # DataFrame으로 변환
                 rows = []
@@ -172,11 +184,21 @@ class ClusteringService:
                 
                 if rows:
                     df = pd.DataFrame(rows)
+                    logger.info(f"Successfully loaded {len(df)} categories from database")
                     print(f"✅ DB에서 카테고리별 통계 로드 완료: {len(df)}개 카테고리")
                     return df
+                else:
+                    logger.warning("No categories found after aggregation")
+                    print("⚠️ 카테고리별 집계 결과가 없습니다.")
+                    return pd.DataFrame()
                 
             except Exception as db_error:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.exception("Database query failed")
                 print(f"⚠️ DB 조회 실패: {db_error}")
+                import traceback
+                traceback.print_exc()
             
             return pd.DataFrame()
             
