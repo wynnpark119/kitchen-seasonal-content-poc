@@ -21,14 +21,25 @@ def render_reddit_collection_status():
     clustering_service_instance = clustering_service.get_clustering_service()
     
     try:
-        # 메서드 존재 확인
-        if not hasattr(clustering_service_instance, 'get_category_overview'):
+        # 카테고리별 오버뷰 조회 (메서드 직접 호출, 예외 처리로 대응)
+        try:
+            overview_df = clustering_service_instance.get_category_overview()
+        except AttributeError as e:
+            # 메서드가 없는 경우
             st.warning("⚠️ 카테고리별 통계 기능을 사용할 수 없습니다.")
             st.info("데이터 수집이 완료되면 결과가 표시됩니다.")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"get_category_overview method not found: {e}")
             return
-        
-        # 카테고리별 오버뷰 조회
-        overview_df = clustering_service_instance.get_category_overview()
+        except Exception as e:
+            # 다른 오류 발생 시
+            st.warning("⚠️ 데이터를 불러오는 중 오류가 발생했습니다.")
+            st.info("데이터 수집이 완료되면 결과가 표시됩니다.")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.exception("Error calling get_category_overview")
+            return
         
         if len(overview_df) == 0:
             st.warning("⚠️ 레딧 수집 데이터가 없습니다.")
