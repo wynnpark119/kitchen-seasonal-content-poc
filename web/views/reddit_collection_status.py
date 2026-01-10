@@ -21,6 +21,12 @@ def render_reddit_collection_status():
     clustering_service_instance = clustering_service.get_clustering_service()
     
     try:
+        # 메서드 존재 확인
+        if not hasattr(clustering_service_instance, 'get_category_overview'):
+            st.warning("⚠️ 카테고리별 통계 기능을 사용할 수 없습니다.")
+            st.info("데이터 수집이 완료되면 결과가 표시됩니다.")
+            return
+        
         # 카테고리별 오버뷰 조회
         overview_df = clustering_service_instance.get_category_overview()
         
