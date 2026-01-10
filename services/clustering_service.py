@@ -111,98 +111,68 @@ class ClusteringService:
         return df[df['topic_category'] == topic_category].copy()
     
     def get_category_overview(self) -> pd.DataFrame:
-        """카테고리별 통계 오버뷰 조회"""
+        """카테고리별 통계 오버뷰 조회 (JSON 파일만 사용)"""
         try:
-            # 먼저 JSON 파일에서 시도
+            import logging
+            logger = logging.getLogger(__name__)
+            
+            # JSON 파일에서만 조회 (DB fallback 제거)
             json_data = self._load_json()
-            if json_data is not None:
-                from collections import defaultdict
-                category_stats = defaultdict(lambda: {'posts': 0, 'comments': 0, 'clusters': 0})
-                
-                # 각 클러스터의 통계 집계
-                for cluster in json_data.get('clusters', []):
-                    category = cluster.get('topic_category', 'UNKNOWN')
-                    category_stats[category]['clusters'] += 1
-                    category_stats[category]['posts'] += cluster.get('size', 0)
+            if json_data is None:
+                logger.warning(f"clustering_results.json 파일을 찾을 수 없습니다: {self.json_path}")
+                print(f"⚠️ clustering_results.json 파일을 찾을 수 없습니다: {self.json_path}")
+                return pd.DataFrame()
+            
+            from collections import defaultdict
+            category_stats = defaultdict(lambda: {'posts': 0, 'comments': 0, 'clusters': 0})
+            
+            # 각 클러스터의 통계 집계
+            clusters = json_data.get('clusters', [])
+            logger.info(f"Processing {len(clusters)} clusters from JSON file")
+            
+            for cluster in clusters:
+                category = cluster.get('topic_category', 'UNKNOWN')
+                if not category or category == 'UNKNOWN':
+                    continue
                     
-                    # 각 포스트의 코멘트 수 합산
-                    for post in cluster.get('posts', []):
-                        category_stats[category]['comments'] += post.get('num_comments', 0)
+                category_stats[category]['clusters'] += 1
+                cluster_size = cluster.get('size', 0)
+                category_stats[category]['posts'] += cluster_size
                 
-                # DataFrame으로 변환
-                rows = []
-                for category, stats in sorted(category_stats.items()):
-                    rows.append({
-                        'category': category,
-                        'clusters': stats['clusters'],
-                        'posts': stats['posts'],
-                        'comments': stats['comments']
-                    })
-                
-                if rows:
-                    df = pd.DataFrame(rows)
-                    print(f"✅ JSON에서 카테고리별 통계 로드 완료: {len(df)}개 카테고리")
-                    return df
+                # 각 포스트의 코멘트 수 합산
+                posts = cluster.get('posts', [])
+                for post in posts:
+                    num_comments = post.get('num_comments', 0)
+                    if num_comments:
+                        category_stats[category]['comments'] += int(num_comments)
             
-            # JSON 파일이 없으면 DB에서 조회 (Fallback)
-            print("⚠️ JSON 파일이 없어 DB에서 카테고리별 통계를 조회합니다.")
-            try:
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.info("Attempting to load category overview from database...")
-                
-                df_all = get_clustering_results_from_db()
-                logger.info(f"DB query returned {len(df_all)} clusters")
-                
-                if len(df_all) == 0:
-                    logger.warning("No clusters found in database")
-                    print("⚠️ DB에 클러스터 데이터가 없습니다.")
-                    return pd.DataFrame()
-                
-                # 카테고리별 집계
-                from collections import defaultdict
-                category_stats = defaultdict(lambda: {'posts': 0, 'comments': 0, 'clusters': 0})
-                
-                for _, row in df_all.iterrows():
-                    category = row.get('topic_category', 'UNKNOWN')
-                    if pd.isna(category):
-                        category = 'UNKNOWN'
-                    category_stats[category]['clusters'] += 1
-                    size = row.get('size', 0)
-                    if pd.notna(size):
-                        category_stats[category]['posts'] += int(size)
-                
-                # DataFrame으로 변환
-                rows = []
-                for category, stats in sorted(category_stats.items()):
-                    rows.append({
-                        'category': category,
-                        'clusters': stats['clusters'],
-                        'posts': stats['posts'],
-                        'comments': stats['comments']  # DB에서는 코멘트 수를 직접 가져올 수 없으므로 0
-                    })
-                
-                if rows:
-                    df = pd.DataFrame(rows)
-                    logger.info(f"Successfully loaded {len(df)} categories from database")
-                    print(f"✅ DB에서 카테고리별 통계 로드 완료: {len(df)}개 카테고리")
-                    return df
-                else:
-                    logger.warning("No categories found after aggregation")
-                    print("⚠️ 카테고리별 집계 결과가 없습니다.")
-                    return pd.DataFrame()
-                
-            except Exception as db_error:
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.exception("Database query failed")
-                print(f"⚠️ DB 조회 실패: {db_error}")
-                import traceback
-                traceback.print_exc()
+            # DataFrame으로 변환
+            rows = []
+            for category, stats in sorted(category_stats.items()):
+                rows.append({
+                    'category': category,
+                    'clusters': stats['clusters'],
+                    'posts': stats['posts'],
+                    'comments': stats['comments']
+                })
             
-            return pd.DataFrame()
+            if rows:
+                df = pd.DataFrame(rows)
+                logger.info(f"✅ JSON에서 카테고리별 통계 로드 완료: {len(df)}개 카테고리")
+                print(f"✅ JSON에서 카테고리별 통계 로드 완료: {len(df)}개 카테고리")
+                # 각 카테고리별 상세 로그
+                for _, row in df.iterrows():
+                    print(f"  - {row['category']}: 클러스터 {row['clusters']}개, 포스트 {row['posts']}개, 코멘트 {row['comments']:,}개")
+                return df
+            else:
+                logger.warning("카테고리별 집계 결과가 없습니다.")
+                print("⚠️ 카테고리별 집계 결과가 없습니다.")
+                return pd.DataFrame()
             
         except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.exception("Error getting category overview")
             print(f"Error getting category overview: {e}")
             import traceback
             traceback.print_exc()
