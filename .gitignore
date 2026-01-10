@@ -2,6 +2,8 @@
 data/
 !data/master_topics.json
 !data/master_topics_final_kr_en_RICH_WHY.json
+clustering_results.json
+!clustering_results.json
 __pycache__/
 *.pyc
 .streamlit/*.log
