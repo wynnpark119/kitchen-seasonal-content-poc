@@ -252,7 +252,7 @@ def render_topic_card(topic: Dict, index: int, category_key: str):
             
             # 버튼 표시 (캐시가 있으면 다른 텍스트)
             if cached_result:
-                button_label = "🔄 LG전자 HS 콘텐츠 인사이트 다시 보기"
+                button_label = "🔄 LG전자 HS 콘텐츠 인사이트 다시 생성하기"
             else:
                 button_label = "🔍 LG전자 HS 콘텐츠 인사이트 보기"
             
@@ -262,17 +262,23 @@ def render_topic_card(topic: Dict, index: int, category_key: str):
                 type="primary"
             )
             
-            # 버튼 클릭 시 표시 플래그 설정
+            # 버튼 클릭 시 표시 플래그 설정 및 캐시 무시 플래그 설정
             if button_clicked:
                 st.session_state[show_insight_key] = True
+                # 버튼을 다시 눌렀으면 캐시 무시하고 새로 생성
+                st.session_state[f"{cache_key}_force_regenerate"] = True
+            
+            # 강제 재생성 플래그 확인
+            force_regenerate = st.session_state.get(f"{cache_key}_force_regenerate", False)
             
             # 표시할지 결정 (버튼 클릭했거나 이미 표시 중이거나 캐시가 있으면 표시)
-            if button_clicked or should_show or cached_result:
-                if cached_result:
-                    # 캐시된 결과 표시
+            if button_clicked or should_show or (cached_result and not force_regenerate):
+                if cached_result and not force_regenerate:
+                    # 캐시된 결과 표시 (강제 재생성 요청이 없을 때만)
                     st.markdown("### 📌 LG HS Strategic Content Insight")
                     st.markdown(cached_result)
-                elif button_clicked:
+                    st.info("💡 새로운 인사이트를 생성하려면 '다시 생성하기' 버튼을 클릭하세요.")
+                elif button_clicked or force_regenerate:
                     # GPT 호출 (버튼 클릭 시에만, 캐시가 없을 때)
                     with st.spinner("⏳ LG HS 관점 인사이트 생성 중..."):
                         error_traceback_str = None
@@ -314,9 +320,10 @@ def render_topic_card(topic: Dict, index: int, category_key: str):
                             )
                             
                             if insight:
-                                # 캐시에 저장
+                                # 캐시에 저장 및 강제 재생성 플래그 제거
                                 st.session_state.hs_insight_cache[cache_key] = insight
                                 st.session_state[show_insight_key] = True
+                                st.session_state[f"{cache_key}_force_regenerate"] = False
                                 st.markdown("### 📌 LG HS Strategic Content Insight")
                                 st.markdown(insight)
                             elif error_msg:
@@ -390,27 +397,46 @@ def render_category_section(category_key: str, topics: list):
 
 def render_master_topics():
     """Master Topics 탭 렌더링"""
-    # 프로젝트 루트 경로
-    project_root = Path(__file__).parent.parent.parent
+    # 프로젝트 루트 경로 (여러 가능한 경로 시도)
+    current_file = Path(__file__)
+    
+    # 가능한 프로젝트 루트 경로들
+    possible_roots = [
+        current_file.parent.parent.parent,  # web/views/master_topics.py -> 프로젝트 루트
+        Path("/app"),  # Railway Docker 환경
+        Path.cwd(),  # 현재 작업 디렉토리
+    ]
     
     # JSON 파일 경로 (올바른 형식의 파일을 우선적으로 찾음)
-    possible_paths = [
-        project_root / "data" / "master_topics_final_kr_en_RICH_WHY.json",
-        project_root / "master_topics_final_kr_en_RICH_WHY.json",
-        # master_topics.json은 마크다운 문자열 형식이므로 제외
-    ]
+    possible_paths = []
+    for root in possible_roots:
+        possible_paths.extend([
+            root / "data" / "master_topics_final_kr_en_RICH_WHY.json",
+            root / "master_topics_final_kr_en_RICH_WHY.json",
+        ])
+    
+    # 절대 경로도 시도
+    possible_paths.extend([
+        Path("/app/data/master_topics_final_kr_en_RICH_WHY.json"),
+        Path("/app/master_topics_final_kr_en_RICH_WHY.json"),
+    ])
     
     # 파일 찾기
     json_path = None
     for path in possible_paths:
-        if path.exists():
-            json_path = str(path)
-            break
+        try:
+            if path.exists():
+                json_path = str(path)
+                break
+        except Exception:
+            continue
     
     if not json_path:
-        st.error("마스터 토픽 JSON 파일을 찾을 수 없습니다. 다음 경로를 확인해주세요:")
-        for path in possible_paths:
+        st.warning("⚠️ 마스터 토픽 JSON 파일을 찾을 수 없습니다.")
+        st.info("DB에서 마스터 토픽 데이터를 불러오는 기능을 사용하거나, 다음 경로에 파일을 확인해주세요:")
+        for path in possible_paths[:4]:  # 처음 4개만 표시
             st.text(f"  - {path}")
+        st.info("💡 DB에서 데이터를 불러오려면 'Clustering Results' 탭을 사용해주세요.")
         return
     
     # JSON 로드
@@ -428,6 +454,68 @@ def render_master_topics():
                 st.info("마스터 토픽 파일은 각 카테고리가 토픽 객체의 리스트여야 합니다.")
                 st.info(f"현재 파일: {json_path}")
                 return
+    
+    # ========================================================================
+    # 마스터 토픽 인사이트 Overview
+    # ========================================================================
+    with st.expander("🔍 마스터 토픽 인사이트 Overview - 봄 시즌 주방에서 나타나는 변화는 새로운 트렌드의 등장이라기보다, 기존 생활 방식이 더 이상 잘 작동하지 않는 순간에 대한 반응에 가깝습니다.", expanded=False):
+        st.markdown("""
+봄 시즌 주방에서 나타나는 변화는 새로운 트렌드의 등장이라기보다,  
+기존 생활 방식이 더 이상 잘 작동하지 않는 순간에 대한 반응에 가깝습니다.  
+고객은 '새로 해보고 싶어서' 움직이기보다, 지금의 방식이 맞지 않다는 불편을 해소하려고 움직입니다.
+
+이번 마스터 토픽은 바로 그 지점에서 갈라진 문제들을 정리한 결과입니다.
+
+---
+
+**Spring Recipes**
+
+봄 레시피에 대한 관심은 '가벼운 요리'에 대한 욕망이 아니라,  
+가벼운 식단이 반복해서 실패해온 경험에 대한 보완 욕구로 나타납니다.  
+그래서 레시피 추천보다  
+왜 봄철 식단 전환이 만족스럽지 않은지,  
+어디서 허기와 번거로움이 생기는지를 짚는 주제가 중심이 됩니다.
+
+→ 이 카테고리는 요리 아이디어가 아니라  
+저녁 식사 루틴을 가볍게 재설계하려는 흐름을 담고 있습니다.
+
+---
+
+**Refrigerator Organization**
+
+냉장고 정리는 '정리법'의 문제가 아니라  
+유지되지 않는 구조에 대한 반복적인 좌절로 인식됩니다.  
+정리는 했지만 며칠 지나 무너지는 경험이 누적되면서,  
+고객의 관심은 팁에서 구조와 루틴으로 이동합니다.
+
+→ 이 주제는 정리 노하우가 아니라  
+냉장고가 무너지는 패턴 자체를 다시 설계하려는 시도입니다.
+
+---
+
+**Vegetable Prep & Handling**
+
+채소 관련 고민은 구매보다  
+손질 이후, 보관 이후, 시간이 지난 시점에 집중됩니다.  
+Meal Prep이 실패하는 이유 역시 의지나 계획이 아니라,  
+채소가 계획을 망치는 변수로 작동하기 때문입니다.
+
+→ 이 카테고리는 채소를 '잘 다루는 법'이 아니라  
+식단 계획을 무너뜨리지 않게 관리하는 방법에 대한 탐색입니다.
+
+---
+
+**Spring Kitchen Styling**
+
+봄철 주방 스타일링은 변화에 대한 욕구와  
+관리 부담에 대한 현실 사이의 타협으로 나타납니다.  
+크게 바꾸기보다 작게 바꾸고, 오래 유지하려는 방향이 선호됩니다.
+
+→ 이 주제는 인테리어가 아니라  
+일상 속에서 유지 가능한 분위기 전환에 초점이 맞춰져 있습니다.
+        """)
+    
+    st.markdown("---")
     
     # 필터 Selectbox (라벨 제거, width 늘리기)
     filter_options = [
