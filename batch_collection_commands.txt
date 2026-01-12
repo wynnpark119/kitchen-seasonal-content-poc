@@ -1,0 +1,209 @@
+총 98개 키워드를 10개 배치로 나눕니다.
+각 배치당 10개 키워드, 최대 300개 포스트
+
+================================================================================
+모든 배치 MCP 호출 (동시 실행 가능)
+================================================================================
+
+# 배치 1/10
+mcp_apify_call-actor(
+    actor='harshmaur/reddit-scraper',
+    step='call',
+    input={
+        'searchTerms': ['what to cook in spring', 'spring meal prep', 'light spring recipes', 'quick spring dinner', 'spring weeknight meals', 'healthy spring meals', 'what do you cook in spring', 'best spring dinner ideas', 'spring kitchen decor', 'kitchen spring refresh'],
+        'searchPosts': True,
+        'searchComments': False,
+        'crawlCommentsPerPost': True,
+        'maxPostsCount': 300,
+        'maxCommentsPerPost': 3,
+        'fastMode': True,
+        'searchSort': 'hot',
+        'searchTime': 'all',
+        'includeNSFW': False,
+        'proxy': {'useApifyProxy': True, 'apifyProxyGroups': ['RESIDENTIAL']}
+    }
+)
+
+
+# 배치 2/10
+mcp_apify_call-actor(
+    actor='harshmaur/reddit-scraper',
+    step='call',
+    input={
+        'searchTerms': ['spring table setting ideas', 'how to decorate kitchen for spring', 'spring kitchen ideas', 'kitchen spring makeover', 'spring kitchen styling', 'spring home decor kitchen', 'spring kitchen update', 'spring kitchen refresh ideas', 'spring kitchen decoration', 'spring kitchen design ideas'],
+        'searchPosts': True,
+        'searchComments': False,
+        'crawlCommentsPerPost': True,
+        'maxPostsCount': 300,
+        'maxCommentsPerPost': 3,
+        'fastMode': True,
+        'searchSort': 'hot',
+        'searchTime': 'all',
+        'includeNSFW': False,
+        'proxy': {'useApifyProxy': True, 'apifyProxyGroups': ['RESIDENTIAL']}
+    }
+)
+
+
+# 배치 3/10
+mcp_apify_call-actor(
+    actor='harshmaur/reddit-scraper',
+    step='call',
+    input={
+        'searchTerms': ['spring kitchen colors', 'spring kitchen accessories', 'spring kitchen centerpiece', 'spring kitchen window decor', 'spring kitchen counter decor', 'spring kitchen wall decor', 'spring kitchen lighting', 'spring kitchen plants', 'spring kitchen organization decor', 'spring kitchen rug'],
+        'searchPosts': True,
+        'searchComments': False,
+        'crawlCommentsPerPost': True,
+        'maxPostsCount': 300,
+        'maxCommentsPerPost': 3,
+        'fastMode': True,
+        'searchSort': 'hot',
+        'searchTime': 'all',
+        'includeNSFW': False,
+        'proxy': {'useApifyProxy': True, 'apifyProxyGroups': ['RESIDENTIAL']}
+    }
+)
+
+
+# 배치 4/10
+mcp_apify_call-actor(
+    actor='harshmaur/reddit-scraper',
+    step='call',
+    input={
+        'searchTerms': ['spring kitchen curtains', 'spring kitchen art', 'how do you decorate your kitchen for spring', 'what spring decor do you use in kitchen', 'anyone else refresh kitchen for spring', 'best way to style kitchen for spring', 'what spring colors work in kitchen', 'how do you make kitchen feel spring', 'refrigerator organization', 'fridge organization tips'],
+        'searchPosts': True,
+        'searchComments': False,
+        'crawlCommentsPerPost': True,
+        'maxPostsCount': 300,
+        'maxCommentsPerPost': 3,
+        'fastMode': True,
+        'searchSort': 'hot',
+        'searchTime': 'all',
+        'includeNSFW': False,
+        'proxy': {'useApifyProxy': True, 'apifyProxyGroups': ['RESIDENTIAL']}
+    }
+)
+
+
+# 배치 5/10
+mcp_apify_call-actor(
+    actor='harshmaur/reddit-scraper',
+    step='call',
+    input={
+        'searchTerms': ['how to organize refrigerator', 'refrigerator storage ideas', 'fridge organization system', 'refrigerator organization hacks', 'how do you organize your fridge', 'fridge organization methods', 'refrigerator organization tips', 'fridge storage organization', 'refrigerator organization ideas', 'best way to organize fridge'],
+        'searchPosts': True,
+        'searchComments': False,
+        'crawlCommentsPerPost': True,
+        'maxPostsCount': 300,
+        'maxCommentsPerPost': 3,
+        'fastMode': True,
+        'searchSort': 'hot',
+        'searchTime': 'all',
+        'includeNSFW': False,
+        'proxy': {'useApifyProxy': True, 'apifyProxyGroups': ['RESIDENTIAL']}
+    }
+)
+
+
+# 배치 6/10
+mcp_apify_call-actor(
+    actor='harshmaur/reddit-scraper',
+    step='call',
+    input={
+        'searchTerms': ['refrigerator drawer organization', 'fridge shelf organization', 'refrigerator door organization', 'fridge organization containers', 'refrigerator organization bins', 'fridge organization labels', 'refrigerator organization system', 'fridge organization routine', 'refrigerator organization before after', 'fridge organization meal prep'],
+        'searchPosts': True,
+        'searchComments': False,
+        'crawlCommentsPerPost': True,
+        'maxPostsCount': 300,
+        'maxCommentsPerPost': 3,
+        'fastMode': True,
+        'searchSort': 'hot',
+        'searchTime': 'all',
+        'includeNSFW': False,
+        'proxy': {'useApifyProxy': True, 'apifyProxyGroups': ['RESIDENTIAL']}
+    }
+)
+
+
+# 배치 7/10
+mcp_apify_call-actor(
+    actor='harshmaur/reddit-scraper',
+    step='call',
+    input={
+        'searchTerms': ['refrigerator organization small fridge', 'fridge organization family', 'how do you organize your refrigerator', "what's the best way to organize fridge", 'anyone else struggle with fridge organization', 'how do you keep fridge organized', 'what do you use to organize fridge', 'best tips for refrigerator organization', 'vegetable prep', 'how to prep vegetables'],
+        'searchPosts': True,
+        'searchComments': False,
+        'crawlCommentsPerPost': True,
+        'maxPostsCount': 300,
+        'maxCommentsPerPost': 3,
+        'fastMode': True,
+        'searchSort': 'hot',
+        'searchTime': 'all',
+        'includeNSFW': False,
+        'proxy': {'useApifyProxy': True, 'apifyProxyGroups': ['RESIDENTIAL']}
+    }
+)
+
+
+# 배치 8/10
+mcp_apify_call-actor(
+    actor='harshmaur/reddit-scraper',
+    step='call',
+    input={
+        'searchTerms': ['vegetable storage tips', 'how to store vegetables', 'vegetable washing tips', 'how to wash vegetables', 'vegetable prep meal prep', 'best way to prep vegetables', 'vegetable handling tips', 'how to clean vegetables', 'vegetable prep ideas', 'vegetable storage methods'],
+        'searchPosts': True,
+        'searchComments': False,
+        'crawlCommentsPerPost': True,
+        'maxPostsCount': 300,
+        'maxCommentsPerPost': 3,
+        'fastMode': True,
+        'searchSort': 'hot',
+        'searchTime': 'all',
+        'includeNSFW': False,
+        'proxy': {'useApifyProxy': True, 'apifyProxyGroups': ['RESIDENTIAL']}
+    }
+)
+
+
+# 배치 9/10
+mcp_apify_call-actor(
+    actor='harshmaur/reddit-scraper',
+    step='call',
+    input={
+        'searchTerms': ['vegetable prep containers', 'vegetable storage containers', 'how to store cut vegetables', 'vegetable prep ahead', 'vegetable washing methods', 'vegetable prep for meal prep', 'vegetable storage fridge', 'vegetable prep routine', 'vegetable washing techniques', 'vegetable prep tips'],
+        'searchPosts': True,
+        'searchComments': False,
+        'crawlCommentsPerPost': True,
+        'maxPostsCount': 300,
+        'maxCommentsPerPost': 3,
+        'fastMode': True,
+        'searchSort': 'hot',
+        'searchTime': 'all',
+        'includeNSFW': False,
+        'proxy': {'useApifyProxy': True, 'apifyProxyGroups': ['RESIDENTIAL']}
+    }
+)
+
+
+# 배치 10/10
+mcp_apify_call-actor(
+    actor='harshmaur/reddit-scraper',
+    step='call',
+    input={
+        'searchTerms': ['vegetable storage hacks', 'vegetable prep organization', 'how do you prep vegetables', "what's the best way to prep vegetables", 'how do you wash vegetables', 'anyone else prep vegetables ahead', 'how do you store vegetables', 'best way to store cut vegetables'],
+        'searchPosts': True,
+        'searchComments': False,
+        'crawlCommentsPerPost': True,
+        'maxPostsCount': 300,
+        'maxCommentsPerPost': 3,
+        'fastMode': True,
+        'searchSort': 'hot',
+        'searchTime': 'all',
+        'includeNSFW': False,
+        'proxy': {'useApifyProxy': True, 'apifyProxyGroups': ['RESIDENTIAL']}
+    }
+)
+
+================================================================================
+총 10개 배치를 동시에 실행할 수 있습니다.
+================================================================================

@@ -5,16 +5,59 @@ pgvector 자동 감지 및 분기 처리 포함
 """
 import psycopg2
 import json
-from psycopg2.extras import execute_values, execute_batch, Json
+from psycopg2.extras import execute_values, execute_batch, Json as PsycopgJson
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 from psycopg2 import pool
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Tuple
 import os
 import threading
 import time
 from functools import wraps
 from datetime import datetime
+from pathlib import Path
 from .logging import setup_logger
+try:
+    from .config import DB_POOL_MINCONN, DB_POOL_MAXCONN, DB_POOL_ACQUIRE_TIMEOUT, DB_ALLOW_DIRECT_FALLBACK
+except ImportError:
+    # Fallback if config not available
+    DB_POOL_MINCONN = int(os.getenv("DB_POOL_MINCONN", "5"))
+    DB_POOL_MAXCONN = int(os.getenv("DB_POOL_MAXCONN", "20"))
+    DB_POOL_ACQUIRE_TIMEOUT = float(os.getenv("DB_POOL_ACQUIRE_TIMEOUT", "10.0"))
+    DB_ALLOW_DIRECT_FALLBACK = os.getenv("DB_ALLOW_DIRECT_FALLBACK", "false").lower() == "true"
+
+# .env 파일 로드 (dotenv가 있으면 사용, 없으면 직접 읽기)
+try:
+    from dotenv import load_dotenv
+    project_root = Path(__file__).parent.parent.parent
+    env_path = project_root / ".env"
+    if env_path.exists():
+        try:
+            load_dotenv(dotenv_path=env_path)
+        except (PermissionError, IOError):
+            # .env 파일 접근 권한이 없으면 환경 변수만 사용
+            logger.debug("Could not read .env file, using environment variables only")
+            load_dotenv()  # 시스템 환경 변수만 로드
+    else:
+        load_dotenv()
+except ImportError:
+    # dotenv가 없으면 .env 파일을 직접 읽기 (권한 체크)
+    project_root = Path(__file__).parent.parent.parent
+    env_path = project_root / ".env"
+    if env_path.exists():
+        try:
+            with open(env_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        key, value = line.split('=', 1)
+                        key = key.strip()
+                        value = value.strip().strip('"').strip("'")
+                        # 이미 환경 변수가 설정되어 있지 않을 때만 설정
+                        if key and not os.getenv(key):
+                            os.environ[key] = value
+        except (PermissionError, IOError):
+            # .env 파일 접근 권한이 없으면 환경 변수만 사용
+            pass
 
 logger = setup_logger("db")
 
@@ -63,14 +106,16 @@ def get_connection_pool():
                 logger.debug(f"SSL mode: {'sslmode' in database_url.lower()}")
                 
                 try:
-                    # Connection pool 생성 (min 2, max 10)
+                    # Connection pool 생성 (환경 변수로 설정 가능)
+                    pool_start = time.time()
                     _connection_pool = psycopg2.pool.ThreadedConnectionPool(
-                        minconn=2,
-                        maxconn=10,
+                        minconn=DB_POOL_MINCONN,
+                        maxconn=DB_POOL_MAXCONN,
                         dsn=database_url,
                         connect_timeout=10  # 연결 타임아웃 10초
                     )
-                    logger.info("Connection pool created successfully")
+                    elapsed = time.time() - pool_start
+                    logger.info(f"Connection pool created successfully ({elapsed:.3f}s)")
                 except Exception as e:
                     logger.error(f"Failed to create connection pool: {e}")
                     logger.error(f"Database URL pattern: {url_masked}")
@@ -78,32 +123,85 @@ def get_connection_pool():
     return _connection_pool
 
 def get_db_connection():
-    """Get database connection from pool"""
+    """Get database connection from pool with instrumentation"""
+    acquire_start = time.time()
+    logger.debug(f"[DB] Acquiring connection from pool...")
+    
     try:
         pool = get_connection_pool()
-        conn = pool.getconn()
-        return conn
+        
+        # Pool acquire timeout 체크 (환경 변수로 설정 가능)
+        acquire_timeout = DB_POOL_ACQUIRE_TIMEOUT
+        conn = None
+        
+        # 타임아웃을 고려한 연결 획득
+        start_acquire = time.time()
+        while True:
+            try:
+                conn = pool.getconn()
+                elapsed = time.time() - start_acquire
+                logger.debug(f"[DB] Connection acquired from pool ({elapsed:.3f}s)")
+                return conn
+            except psycopg2.pool.PoolError:
+                # Pool이 가득 찬 경우
+                elapsed = time.time() - start_acquire
+                if elapsed > acquire_timeout:
+                    # 풀 상태 정보 수집
+                    try:
+                        pool_stats = {
+                            "minconn": DB_POOL_MINCONN,
+                            "maxconn": DB_POOL_MAXCONN,
+                            "acquire_timeout": acquire_timeout,
+                            "elapsed": elapsed
+                        }
+                        logger.error(f"[DB] Pool acquire timeout after {elapsed:.3f}s - pool exhausted. Stats: {pool_stats}")
+                    except:
+                        pass
+                    
+                    # Fallback 정책: 디버그 모드에서만 허용
+                    if DB_ALLOW_DIRECT_FALLBACK:
+                        logger.warning("[DB] ⚠️ DEBUG MODE: Falling back to direct connection. This should not happen in production!")
+                        fallback_start = time.time()
+                        
+                        database_url = (
+                            os.getenv("DATABASE_URL") or 
+                            os.getenv("RAILWAY_DATABASE_URL") or
+                            os.getenv("POSTGRES_URL") or
+                            os.getenv("POSTGRES_PRIVATE_URL")
+                        )
+                        if not database_url:
+                            raise ValueError("DATABASE_URL not found in environment variables")
+                        
+                        # Railway SSL 설정
+                        is_railway = any(pattern in database_url.lower() for pattern in [
+                            'railway.app', 'rlwy.net', 'up.railway.app'
+                        ])
+                        if is_railway and 'sslmode' not in database_url.lower():
+                            separator = '&' if '?' in database_url else '?'
+                            database_url = f"{database_url}{separator}sslmode=require"
+                        
+                        try:
+                            conn = psycopg2.connect(database_url, connect_timeout=10)
+                            elapsed = time.time() - fallback_start
+                            logger.info(f"[DB] Direct connection successful ({elapsed:.3f}s)")
+                            return conn
+                        except Exception as fallback_error:
+                            elapsed = time.time() - fallback_start
+                            logger.error(f"[DB] Direct connection failed after {elapsed:.3f}s: {fallback_error}")
+                            raise
+                    else:
+                        # 기본: 실패로 종료
+                        raise RuntimeError(f"Connection pool exhausted after {acquire_timeout}s. Check for connection leaks. Set DB_ALLOW_DIRECT_FALLBACK=true for debug mode.")
+                time.sleep(0.1)  # 100ms 대기 후 재시도
+                continue
+                
+    except RuntimeError:
+        # 이미 처리된 풀 고갈 에러는 그대로 전파
+        raise
     except Exception as e:
-        logger.error(f"Failed to get connection from pool: {e}")
-        # Fallback: 직접 연결 (SSL 설정 포함)
-        database_url = (
-            os.getenv("DATABASE_URL") or 
-            os.getenv("RAILWAY_DATABASE_URL") or
-            os.getenv("POSTGRES_URL") or
-            os.getenv("POSTGRES_PRIVATE_URL")
-        )
-        if not database_url:
-            raise ValueError("DATABASE_URL not found in environment variables")
-        
-        # Railway SSL 설정 (fallback에도 적용)
-        is_railway = any(pattern in database_url.lower() for pattern in [
-            'railway.app', 'rlwy.net', 'up.railway.app'
-        ])
-        if is_railway and 'sslmode' not in database_url.lower():
-            separator = '&' if '?' in database_url else '?'
-            database_url = f"{database_url}{separator}sslmode=require"
-        
-        return psycopg2.connect(database_url, connect_timeout=10)
+        elapsed = time.time() - acquire_start
+        logger.error(f"[DB] Failed to get connection from pool after {elapsed:.3f}s: {e}")
+        raise
 
 def put_db_connection(conn):
     """Return connection to pool"""
@@ -153,8 +251,9 @@ def check_pgvector_available() -> bool:
     if _pgvector_available is not None:
         return _pgvector_available
     
-    conn = get_db_connection()
+    conn = None
     try:
+        conn = get_db_connection()
         with conn.cursor() as cur:
             # Check if vector type exists
             cur.execute("""
@@ -169,12 +268,14 @@ def check_pgvector_available() -> bool:
         _pgvector_available = False
         return False
     finally:
-        conn.close()
+        if conn:
+            put_db_connection(conn)  # ✅ 풀에 반환
 
 def create_pipeline_run(run_type: str, status: str = "running") -> int:
     """Create a new pipeline run and return run_id"""
-    conn = get_db_connection()
+    conn = None
     try:
+        conn = get_db_connection()
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO pipeline_runs (run_type, status, started_at)
@@ -185,7 +286,8 @@ def create_pipeline_run(run_type: str, status: str = "running") -> int:
             conn.commit()
             return run_id
     finally:
-        conn.close()
+        if conn:
+            put_db_connection(conn)  # ✅ 풀에 반환
 
 @retry_db_operation(max_retries=3, backoff=1.0)
 def update_pipeline_run(run_id: int, status: str, error_message: Optional[str] = None, metadata: Optional[Dict] = None):
@@ -199,13 +301,13 @@ def update_pipeline_run(run_id: int, status: str, error_message: Optional[str] =
                     UPDATE pipeline_runs
                     SET status = %s, completed_at = %s, metadata = %s
                     WHERE run_id = %s
-                """, (status, datetime.utcnow(), Json(metadata) if metadata else None, run_id))
+                """, (status, datetime.utcnow(), PsycopgJson(metadata) if metadata else None, run_id))
             else:
                 cur.execute("""
                     UPDATE pipeline_runs
                     SET status = %s, error_message = %s, metadata = %s
                     WHERE run_id = %s
-                """, (status, error_message, Json(metadata) if metadata else None, run_id))
+                """, (status, error_message, PsycopgJson(metadata) if metadata else None, run_id))
             conn.commit()
     finally:
         if conn:
@@ -251,7 +353,7 @@ def upsert_reddit_post(post_data: Dict[str, Any], run_id: int) -> bool:
                 (post_data.get('permalink', '') or '')[:5000] or None,
                 (post_data.get('url', '') or '')[:5000] or None,
                 (post_data.get('keyword', '') or '')[:200],
-                Json(post_data)
+PsycopgJson(post_data)
             ))
             conn.commit()
             return True
@@ -286,15 +388,34 @@ def upsert_reddit_posts_batch(posts_data: List[Dict[str, Any]], run_id: int) -> 
     conn = None
     stats = {"inserted": 0, "updated": 0, "errors": 0}
     
-    @retry_db_operation(max_retries=3, backoff=2.0)
     def _execute_batch_insert(insert_data):
+        """Execute batch insert with proper connection management and instrumentation"""
         nonlocal conn, stats
+        attempt_conn = None
+        batch_size = len(insert_data)
         
-        conn = get_db_connection()
-        cur = conn.cursor()
+        logger.info(f"[BATCH] Starting batch insert: {batch_size} items")
         
         try:
+            # 연결 획득
+            conn_start = time.time()
+            logger.debug(f"[BATCH] Acquiring connection...")
+            attempt_conn = get_db_connection()
+            conn_elapsed = time.time() - conn_start
+            logger.debug(f"[BATCH] Connection acquired ({conn_elapsed:.3f}s)")
+            
+            # Statement timeout 설정 (60초)
+            cur = attempt_conn.cursor()
+            cur.execute("SET statement_timeout = 60000")  # 60초 (밀리초 단위)
+            logger.debug(f"[BATCH] Statement timeout set to 60s")
+            
+            # 트랜잭션 시작 (명시적)
+            logger.debug(f"[BATCH] Starting transaction...")
+            tx_start = time.time()
+            
             # 배치 INSERT
+            insert_start = time.time()
+            logger.info(f"[BATCH] Executing batch insert: {batch_size} items...")
             execute_batch(cur, """
                 INSERT INTO raw_reddit_posts (
                     reddit_post_id, subreddit, title, body, author,
@@ -306,22 +427,55 @@ def upsert_reddit_posts_batch(posts_data: List[Dict[str, Any]], run_id: int) -> 
                     num_comments = EXCLUDED.num_comments,
                     updated_at = CURRENT_TIMESTAMP
             """, insert_data, page_size=100)
+            insert_elapsed = time.time() - insert_start
+            logger.info(f"[BATCH] Batch insert executed ({insert_elapsed:.3f}s, {batch_size/insert_elapsed:.1f} items/s)")
             
-            stats["inserted"] = len(insert_data)
-            conn.commit()
-            logger.info(f"Batch upserted {stats['inserted']} posts, {stats['errors']} errors")
+            # 커밋
+            commit_start = time.time()
+            logger.debug(f"[BATCH] Committing transaction...")
+            attempt_conn.commit()
+            commit_elapsed = time.time() - commit_start
+            tx_elapsed = time.time() - tx_start
+            logger.info(f"[BATCH] Transaction committed ({commit_elapsed:.3f}s, total tx: {tx_elapsed:.3f}s)")
             
+            stats["inserted"] = batch_size
+            logger.info(f"[BATCH] ✅ Batch upserted {stats['inserted']} posts successfully")
+            
+            # 성공 시 연결을 외부 변수에 저장하고 반환하지 않음 (finally에서 반환)
+            conn = attempt_conn
+            attempt_conn = None  # finally에서 반환하지 않도록
+            
+        except psycopg2.extensions.QueryCanceledError as e:
+            logger.error(f"[BATCH] ❌ Query timeout (statement_timeout exceeded): {e}")
+            if attempt_conn:
+                try:
+                    attempt_conn.rollback()
+                    logger.debug(f"[BATCH] Transaction rolled back after timeout")
+                except:
+                    pass
+            raise
         except Exception as e:
-            if conn:
-                conn.rollback()
-            logger.error(f"Batch insert error: {e}", exc_info=True)
+            if attempt_conn:
+                try:
+                    rollback_start = time.time()
+                    attempt_conn.rollback()
+                    rollback_elapsed = time.time() - rollback_start
+                    logger.debug(f"[BATCH] Transaction rolled back ({rollback_elapsed:.3f}s)")
+                except:
+                    pass
+            logger.error(f"[BATCH] ❌ Batch insert error: {e}", exc_info=True)
             # 첫 번째 실패한 레코드 샘플 로깅
             if insert_data:
                 sample = insert_data[0]
-                logger.error(f"Sample data (first record): post_id={sample[0]}, "
+                logger.error(f"[BATCH] Sample data (first record): post_id={sample[0]}, "
                            f"title_len={len(sample[2]) if sample[2] else 0}, "
                            f"body_len={len(sample[3]) if sample[3] else 0}")
             raise
+        finally:
+            # 실패한 연결은 즉시 반환 (성공한 연결은 conn에 저장되어 외부 finally에서 반환)
+            if attempt_conn:
+                logger.debug(f"[BATCH] Returning failed connection to pool")
+                put_db_connection(attempt_conn)
     
     try:
         # 배치 처리용 데이터 준비
@@ -351,7 +505,7 @@ def upsert_reddit_posts_batch(posts_data: List[Dict[str, Any]], run_id: int) -> 
                     (post_data.get('permalink', '') or '')[:5000] or None,
                     (post_data.get('url', '') or '')[:5000] or None,
                     (post_data.get('keyword', '') or '')[:200],
-                    Json(post_data)
+    PsycopgJson(post_data)
                 ))
             except Exception as e:
                 logger.error(f"Error preparing post data {post_data.get('id', 'unknown')}: {e}")
@@ -361,8 +515,24 @@ def upsert_reddit_posts_batch(posts_data: List[Dict[str, Any]], run_id: int) -> 
         if not insert_data:
             return stats
         
-        # 배치 INSERT 실행 (재시도 포함)
-        _execute_batch_insert(insert_data)
+        # 재시도 로직을 수동으로 구현하여 연결 관리 명확히 함
+        last_exception = None
+        for attempt in range(3):  # max_retries=3
+            try:
+                _execute_batch_insert(insert_data)
+                break  # 성공 시 루프 종료
+            except (psycopg2.OperationalError, psycopg2.InterfaceError, psycopg2.DatabaseError) as e:
+                last_exception = e
+                if attempt < 2:  # 마지막 시도가 아니면
+                    wait_time = 2.0 * (2 ** attempt)  # exponential backoff
+                    logger.warning(f"Batch insert failed (attempt {attempt + 1}/3): {e}. Retrying in {wait_time}s...")
+                    time.sleep(wait_time)
+                else:
+                    logger.error(f"Batch insert failed after 3 attempts: {e}")
+                    raise
+            except Exception as e:
+                # 재시도하지 않는 에러는 즉시 raise
+                raise
         
     except Exception as e:
         logger.error(f"Batch upsert error (final): {e}", exc_info=True)
@@ -410,7 +580,7 @@ def upsert_reddit_comment(comment_data: Dict[str, Any], post_id: str, run_id: in
                 created_utc,
                 max(0, int(comment_data.get('ups', 0))),
                 bool(comment_data.get('is_top', False)),
-                Json(comment_data)
+PsycopgJson(comment_data)
             ))
             conn.commit()
             return True
@@ -425,8 +595,9 @@ def upsert_reddit_comment(comment_data: Dict[str, Any], post_id: str, run_id: in
 
 def upsert_gsc_query(gsc_data: Dict[str, Any], run_id: int) -> bool:
     """Upsert GSC query data"""
-    conn = get_db_connection()
+    conn = None
     try:
+        conn = get_db_connection()
         with conn.cursor() as cur:
             # Parse date_month from date
             from datetime import datetime as dt
@@ -458,15 +629,71 @@ def upsert_gsc_query(gsc_data: Dict[str, Any], run_id: int) -> bool:
                 int(gsc_data.get('clicks', 0)),
                 float(gsc_data.get('ctr', 0)),
                 float(gsc_data.get('position', 0)) if gsc_data.get('position') else None,
-                Json(gsc_data)
+PsycopgJson(gsc_data)
             ))
             conn.commit()
             return True
     except Exception as e:
-        conn.rollback()
+        if conn:
+            conn.rollback()
         raise e
     finally:
-        conn.close()
+        if conn:
+            put_db_connection(conn)  # ✅ 풀에 반환
+
+def upsert_embeddings_batch(embeddings_data: List[Tuple[str, str, List[float], str, str, int, int]], 
+                            run_id: int) -> Dict[str, int]:
+    """
+    Batch upsert embeddings (한 커넥션으로 여러 임베딩 저장)
+    
+    Args:
+        embeddings_data: List of (doc_type, doc_id, embedding, text_hash, model_name, dim, run_id)
+        run_id: Pipeline run ID
+    
+    Returns:
+        Statistics dict with inserted/updated counts
+    """
+    if not embeddings_data:
+        return {"inserted": 0, "updated": 0, "errors": 0}
+    
+    conn = None
+    stats = {"inserted": 0, "updated": 0, "errors": 0}
+    
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            # 배치 INSERT
+            insert_data = []
+            for doc_type, doc_id, embedding, text_hash, model_name, dim, _run_id in embeddings_data:
+                insert_data.append((
+                    doc_type, doc_id, text_hash, PsycopgJson(embedding),
+                    model_name, dim, _run_id
+                ))
+            
+            from psycopg2.extras import execute_batch
+            execute_batch(cur, """
+                INSERT INTO embeddings (
+                    doc_type, doc_id, text_hash, embedding_json,
+                    model_name, dim, created_from_run_id
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (doc_type, doc_id, created_from_run_id) DO UPDATE SET
+                    embedding_json = EXCLUDED.embedding_json,
+                    text_hash = EXCLUDED.text_hash,
+                    updated_at = CURRENT_TIMESTAMP
+            """, insert_data, page_size=100)
+            
+            conn.commit()
+            stats["inserted"] = len(embeddings_data)
+            return stats
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        logger.error(f"Error in batch upsert embeddings: {e}")
+        stats["errors"] = len(embeddings_data)
+        raise e
+    finally:
+        if conn:
+            put_db_connection(conn)
 
 def upsert_embedding(doc_type: str, doc_id: str, embedding: List[float], 
                      text_hash: str, model_name: str, dim: int, run_id: int) -> bool:
@@ -482,10 +709,9 @@ def upsert_embedding(doc_type: str, doc_id: str, embedding: List[float],
         dim: Embedding dimension
         run_id: Pipeline run ID
     """
-    conn = get_db_connection()
-    use_pgvector = check_pgvector_available()
-    
+    conn = None
     try:
+        conn = get_db_connection()
         with conn.cursor() as cur:
             # Use JSONB (pgvector는 현재 사용하지 않음, DDL에서 JSONB로 정의됨)
             cur.execute("""
@@ -498,22 +724,25 @@ def upsert_embedding(doc_type: str, doc_id: str, embedding: List[float],
                     text_hash = EXCLUDED.text_hash,
                     updated_at = CURRENT_TIMESTAMP
             """, (
-                doc_type, doc_id, text_hash, Json(embedding),
+                    doc_type, doc_id, text_hash, PsycopgJson(embedding),
                 model_name, dim, run_id
             ))
             conn.commit()
             return True
     except Exception as e:
-        conn.rollback()
+        if conn:
+            conn.rollback()
         raise e
     finally:
-        conn.close()
+        if conn:
+            put_db_connection(conn)  # ✅ 풀에 반환
 
 def upsert_cluster_assignment(cluster_id: int, doc_type: str, doc_id: str,
                               distance: float, is_representative: bool, run_id: int) -> bool:
     """Upsert cluster assignment"""
-    conn = get_db_connection()
+    conn = None
     try:
+        conn = get_db_connection()
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO cluster_assignments (
@@ -529,10 +758,12 @@ def upsert_cluster_assignment(cluster_id: int, doc_type: str, doc_id: str,
             conn.commit()
             return True
     except Exception as e:
-        conn.rollback()
+        if conn:
+            conn.rollback()
         raise e
     finally:
-        conn.close()
+        if conn:
+            put_db_connection(conn)  # ✅ 풀에 반환
 
 def upsert_topic_qa_brief(brief_data: Dict[str, Any], cluster_id: int, 
                           model_name: str, model_version: str, run_id: int,
@@ -548,8 +779,9 @@ def upsert_topic_qa_brief(brief_data: Dict[str, Any], cluster_id: int,
         run_id: Pipeline run ID
         insights_json: Insights module JSON (optional)
     """
-    conn = get_db_connection()
+    conn = None
     try:
+        conn = get_db_connection()
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO topic_qa_briefs (
@@ -574,12 +806,12 @@ def upsert_topic_qa_brief(brief_data: Dict[str, Any], cluster_id: int,
                 brief_data.get('category'),
                 brief_data.get('topic_title'),
                 brief_data.get('primary_question'),
-                Json(brief_data.get('related_questions', [])),
+PsycopgJson(brief_data.get('related_questions', [])),
                 brief_data.get('blog_angle'),
                 brief_data.get('social_angle'),
-                Json(brief_data.get('why_now', {})),
-                Json(brief_data.get('evidence_pack', {})),
-                Json(insights_json) if insights_json else None,
+PsycopgJson(brief_data.get('why_now', {})),
+PsycopgJson(brief_data.get('evidence_pack', {})),
+PsycopgJson(insights_json) if insights_json else None,
                 model_name,
                 model_version,
                 run_id
@@ -587,7 +819,60 @@ def upsert_topic_qa_brief(brief_data: Dict[str, Any], cluster_id: int,
             conn.commit()
             return True
     except Exception as e:
-        conn.rollback()
+        if conn:
+            conn.rollback()
         raise e
     finally:
-        conn.close()
+        if conn:
+            put_db_connection(conn)  # ✅ 풀에 반환
+
+@retry_db_operation(max_retries=3, backoff=1.0)
+def upsert_serp_aio(query: str, aio_data: Dict[str, Any], run_id: int, aio_status: str) -> bool:
+    """Upsert SERP AI Overview data"""
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            from datetime import datetime as dt
+            snapshot_at = dt.utcnow()
+            
+            # Parse cited_sources_json if it's a string
+            cited_sources = aio_data.get('cited_sources_json')
+            if isinstance(cited_sources, str):
+                try:
+                    cited_sources = json.loads(cited_sources)
+                except:
+                    cited_sources = None
+            
+            cur.execute("""
+                INSERT INTO raw_serp_aio (
+                    query, snapshot_at, aio_text, cited_sources_json,
+                    locale, raw_json, run_id, aio_status
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (query, snapshot_at) DO UPDATE SET
+                    aio_text = EXCLUDED.aio_text,
+                    cited_sources_json = EXCLUDED.cited_sources_json,
+                    locale = EXCLUDED.locale,
+                    raw_json = EXCLUDED.raw_json,
+                    aio_status = EXCLUDED.aio_status,
+                    updated_at = CURRENT_TIMESTAMP
+            """, (
+                query[:500],
+                snapshot_at,
+                aio_data.get('aio_text')[:50000] if aio_data.get('aio_text') else None,
+PsycopgJson(cited_sources) if cited_sources else None,
+                aio_data.get('locale', 'en-US')[:10],
+PsycopgJson(aio_data.get('raw_json', '{}')),
+                run_id,
+                aio_status[:50]
+            ))
+            conn.commit()
+            return True
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        logger.error(f"Error upserting SERP AIO for query '{query}': {e}")
+        raise e
+    finally:
+        if conn:
+            put_db_connection(conn)

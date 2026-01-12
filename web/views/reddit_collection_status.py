@@ -1,12 +1,13 @@
 """
 레딧 수집 및 분석 현황 뷰
 
-카테고리별 통계 오버뷰 표시
+주제별 포스트 통계 표시
 """
 import streamlit as st
 import pandas as pd
 import importlib
 import sys
+from datetime import datetime
 
 # 모듈 재로드를 위해 import
 from services import clustering_service
@@ -21,75 +22,67 @@ def render_reddit_collection_status():
     clustering_service_instance = clustering_service.get_clustering_service()
     
     try:
-        # 카테고리별 오버뷰 조회 (메서드 직접 호출, 예외 처리로 대응)
         import logging
         logger = logging.getLogger(__name__)
         
+        # 전체 클러스터 조회
         try:
-            logger.info("Calling get_category_overview...")
-            overview_df = clustering_service_instance.get_category_overview()
-            logger.info(f"get_category_overview returned {len(overview_df)} rows")
+            logger.info("Calling get_all_clusters...")
+            clusters_df = clustering_service_instance.get_all_clusters()
+            logger.info(f"get_all_clusters returned {len(clusters_df)} clusters")
             
         except AttributeError as e:
-            # 메서드가 없는 경우
-            st.warning("⚠️ 카테고리별 통계 기능을 사용할 수 없습니다.")
+            st.warning("⚠️ 클러스터 데이터를 불러올 수 없습니다.")
             st.info("데이터 수집이 완료되면 결과가 표시됩니다.")
-            logger.warning(f"get_category_overview method not found: {e}")
+            logger.warning(f"get_all_clusters method not found: {e}")
             import traceback
             with st.expander("🔍 상세 오류 보기"):
                 st.code(traceback.format_exc())
             return
         except Exception as e:
-            # 다른 오류 발생 시
             st.warning("⚠️ 데이터를 불러오는 중 오류가 발생했습니다.")
             st.info("데이터 수집이 완료되면 결과가 표시됩니다.")
-            logger.exception("Error calling get_category_overview")
+            logger.exception("Error calling get_all_clusters")
             import traceback
             with st.expander("🔍 상세 오류 보기"):
                 st.code(traceback.format_exc())
             return
         
-        if len(overview_df) == 0:
+        if len(clusters_df) == 0:
             st.warning("⚠️ 레딧 수집 데이터가 없습니다.")
             st.info("💡 데이터 수집이 완료되지 않았거나, 데이터베이스에 클러스터링 결과가 없습니다.")
-            st.info("💡 Railway 로그를 확인하여 데이터베이스 연결 및 쿼리 상태를 확인하세요.")
-            logger.warning("get_category_overview returned empty DataFrame")
+            logger.warning("get_all_clusters returned empty DataFrame")
             return
         
-        st.markdown("### 📊 카테고리별 통계")
-        
         # 전체 통계
-        total_posts = overview_df['posts'].sum()
-        total_comments = overview_df['comments'].sum()
-        total_clusters = overview_df['clusters'].sum()
+        total_posts = clusters_df['size'].sum() if 'size' in clusters_df.columns else 0
         
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.metric("전체 클러스터", f"{total_clusters}개")
-        with col2:
-            st.metric("전체 포스트", f"{total_posts}개")
-        with col3:
-            st.metric("전체 코멘트", f"{total_comments:,}개")
-        with col4:
-            avg_comments = total_comments / total_posts if total_posts > 0 else 0
-            st.metric("평균 코멘트/포스트", f"{avg_comments:.1f}개")
+        st.markdown("### 📊 전체 통계")
+        st.metric("전체 포스트", f"{total_posts}개")
+        
+        # 최종 수집 업데이트일
+        today = datetime.now().strftime("%Y년 %m월 %d일")
+        st.caption(f"최종 수집 업데이트일: {today}")
         
         st.markdown("---")
         
-        # 카테고리별 상세 통계
-        st.markdown("#### 카테고리별 상세")
-        category_cols = st.columns(len(overview_df))
+        # 주제별 포스트 개수
+        st.markdown("### 📋 주제별 수집 현황")
         
-        for idx, (_, row) in enumerate(overview_df.iterrows()):
-            with category_cols[idx]:
-                category_name = row['category']
-                # 카테고리 이름을 더 읽기 쉽게 표시
-                display_name = category_name.replace('_', ' ').title()
+        if 'topic_category' in clusters_df.columns:
+            # 카테고리별로 그룹화하여 포스트 개수 집계
+            category_stats = clusters_df.groupby('topic_category')['size'].sum().reset_index()
+            category_stats.columns = ['category', 'posts']
+            category_stats = category_stats.sort_values('category')
+            
+            for _, row in category_stats.iterrows():
+                category = row['category']
+                post_count = int(row['posts'])
+                display_name = category.replace('_', ' ').title()
                 
-                st.markdown(f"**{display_name}**")
-                st.metric("클러스터", f"{int(row['clusters'])}개", delta=None)
-                st.metric("포스트", f"{int(row['posts'])}개", delta=None)
-                st.metric("코멘트", f"{int(row['comments']):,}개", delta=None)
+                st.markdown(f"**{display_name}**: {post_count}개")
+        else:
+            st.info("주제별 정보가 없습니다.")
         
     except Exception as e:
         st.error(f"Error loading reddit collection status: {e}")

@@ -11,20 +11,28 @@ try:
     env_path = Path(__file__).parent.parent / ".env"
     if env_path.exists():
         load_dotenv(dotenv_path=env_path, override=False)
-except ImportError:
+except (ImportError, Exception):
     # dotenv가 없으면 .env 파일을 직접 읽기
-    env_path = Path(__file__).parent.parent / ".env"
-    if env_path.exists():
-        with open(env_path, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith('#') and '=' in line:
-                    key, value = line.split('=', 1)
-                    key = key.strip()
-                    value = value.strip().strip('"').strip("'")
-                    # 이미 환경 변수가 설정되어 있지 않을 때만 설정
-                    if key and not os.getenv(key):
-                        os.environ[key] = value
+    try:
+        env_path = Path(__file__).parent.parent / ".env"
+        if env_path.exists():
+            with open(env_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    try:
+                        line = line.strip()
+                        if line and not line.startswith('#') and '=' in line:
+                            key, value = line.split('=', 1)
+                            key = key.strip()
+                            value = value.strip().strip('"').strip("'")
+                            # 이미 환경 변수가 설정되어 있지 않을 때만 설정
+                            if key and not os.getenv(key):
+                                os.environ[key] = value
+                    except Exception:
+                        # 개별 라인 처리 오류는 무시하고 계속 진행
+                        continue
+    except Exception:
+        # .env 파일 읽기 오류는 무시 (환경 변수 사용)
+        pass
 
 # Database 설정 (worker/pipeline/db.py와 동일한 순서로 읽기)
 DATABASE_URL = (
