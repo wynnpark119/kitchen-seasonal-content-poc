@@ -59,8 +59,15 @@ def load_master_topics_from_db() -> Optional[Dict]:
         # DB에서 모든 마스터 토픽 가져오기
         df = get_master_topics()
         
-        if df is None or len(df) == 0:
+        if df is None:
+            logger.warning("get_master_topics() returned None")
             return None
+            
+        if len(df) == 0:
+            logger.warning("get_master_topics() returned empty DataFrame")
+            return None
+            
+        logger.info(f"DB에서 {len(df)}개의 마스터 토픽 로드됨")
         
         # 카테고리별로 그룹화
         topics_by_category = {}
@@ -105,9 +112,14 @@ def load_master_topics_from_db() -> Optional[Dict]:
         return topics_by_category if topics_by_category else None
         
     except Exception as e:
-        logger.error(f"DB에서 마스터 토픽 로드 오류: {e}")
+        error_msg = f"DB에서 마스터 토픽 로드 오류: {e}"
+        logger.error(error_msg)
         import traceback
-        logger.error(traceback.format_exc())
+        error_trace = traceback.format_exc()
+        logger.error(error_trace)
+        # Streamlit에도 에러 표시
+        st.error(f"❌ {error_msg}")
+        st.code(error_trace, language='python')
         return None
 
 
@@ -505,11 +517,41 @@ def render_master_topics():
     
     # JSON 파일이 없거나 로드 실패 시 DB에서 로드
     if topics_data is None:
-        st.info("📊 JSON 파일을 찾을 수 없어 DB에서 마스터 토픽 데이터를 불러오는 중...")
-        topics_data = load_master_topics_from_db()
+        with st.spinner("📊 JSON 파일을 찾을 수 없어 DB에서 마스터 토픽 데이터를 불러오는 중..."):
+            topics_data = load_master_topics_from_db()
         
         if topics_data is None:
             st.error("❌ 마스터 토픽 데이터를 로드할 수 없습니다.")
+            
+            # DB 연결 테스트
+            try:
+                from web.db_queries import get_db_connection
+                conn = get_db_connection()
+                if conn:
+                    st.info("✅ DB 연결은 정상입니다.")
+                    # 테이블 존재 여부 확인
+                    try:
+                        with conn.cursor() as cur:
+                            cur.execute("""
+                                SELECT COUNT(*) 
+                                FROM information_schema.tables 
+                                WHERE table_name = 'topic_qa_briefs'
+                            """)
+                            table_exists = cur.fetchone()[0] > 0
+                            if table_exists:
+                                cur.execute("SELECT COUNT(*) FROM topic_qa_briefs")
+                                count = cur.fetchone()[0]
+                                st.info(f"📊 topic_qa_briefs 테이블 존재: {table_exists}, 레코드 수: {count}")
+                            else:
+                                st.warning("⚠️ topic_qa_briefs 테이블이 존재하지 않습니다.")
+                        conn.close()
+                    except Exception as e:
+                        st.error(f"테이블 확인 중 오류: {e}")
+                else:
+                    st.error("❌ DB 연결 실패")
+            except Exception as e:
+                st.error(f"DB 연결 테스트 중 오류: {e}")
+            
             st.info("다음 사항을 확인해주세요:")
             st.info("1. DB 연결 상태 확인")
             st.info("2. topic_qa_briefs 테이블에 데이터가 있는지 확인")
@@ -518,7 +560,8 @@ def render_master_topics():
                 st.text(f"  - {path}")
             return
         else:
-            st.success(f"✅ DB에서 {sum(len(v) for v in topics_data.values())}개의 마스터 토픽을 불러왔습니다.")
+            total_topics = sum(len(v) for v in topics_data.values())
+            st.success(f"✅ DB에서 {total_topics}개의 마스터 토픽을 불러왔습니다. ({len(topics_data)}개 카테고리)")
     
     # 데이터 형식 검증: 각 카테고리가 리스트인지 확인
     if isinstance(topics_data, dict):
