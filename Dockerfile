@@ -12,6 +12,12 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# data 디렉토리 생성
+RUN mkdir -p data
+
+# 마스터 토픽 JSON 파일 명시적으로 복사 (로컬 방식 유지)
+COPY data/master_topics_final_kr_en_RICH_WHY.json data/
+
 # 프로젝트 코드 복사
 COPY . .
 

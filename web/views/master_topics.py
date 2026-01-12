@@ -508,16 +508,19 @@ def render_master_topics():
         except Exception:
             continue
     
-    # JSON 파일이 없으면 DB에서 로드 시도
+    # JSON 파일 우선 사용 (로컬 방식 유지)
     topics_data = None
     
     if json_path:
         # JSON 파일 로드 시도
         topics_data = load_master_topics(json_path)
+        if topics_data:
+            st.success(f"✅ JSON 파일에서 마스터 토픽 데이터를 불러왔습니다. ({json_path})")
     
-    # JSON 파일이 없거나 로드 실패 시 DB에서 로드
+    # JSON 파일이 없거나 로드 실패 시에만 DB에서 로드 (fallback)
     if topics_data is None:
-        with st.spinner("📊 JSON 파일을 찾을 수 없어 DB에서 마스터 토픽 데이터를 불러오는 중..."):
+        st.warning("⚠️ JSON 파일을 찾을 수 없어 DB에서 마스터 토픽 데이터를 불러오는 중...")
+        with st.spinner("DB에서 데이터 로드 중..."):
             topics_data = load_master_topics_from_db()
         
         if topics_data is None:
