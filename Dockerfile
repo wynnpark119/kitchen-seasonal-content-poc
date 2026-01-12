@@ -15,6 +15,15 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 프로젝트 코드 복사
 COPY . .
 
+# 마스터 토픽 JSON 파일이 data 디렉토리에 있는지 확인
+RUN if [ -f "data/master_topics_final_kr_en_RICH_WHY.json" ]; then \
+        echo "✅ 마스터 토픽 JSON 파일 확인됨"; \
+        ls -lh data/master_topics_final_kr_en_RICH_WHY.json; \
+    else \
+        echo "⚠️ 마스터 토픽 JSON 파일을 찾을 수 없습니다"; \
+        find . -name "*master_topics*.json" -type f 2>/dev/null | head -5; \
+    fi
+
 # Streamlit 설정 (이미 COPY . . 에서 복사됨)
 RUN mkdir -p .streamlit
 
