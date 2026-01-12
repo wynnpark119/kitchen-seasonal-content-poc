@@ -514,8 +514,6 @@ def render_master_topics():
     if json_path:
         # JSON 파일 로드 시도
         topics_data = load_master_topics(json_path)
-        if topics_data:
-            st.success(f"✅ JSON 파일에서 마스터 토픽 데이터를 불러왔습니다. ({json_path})")
     
     # JSON 파일이 없거나 로드 실패 시에만 DB에서 로드 (fallback)
     if topics_data is None:
