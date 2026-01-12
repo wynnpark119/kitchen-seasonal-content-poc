@@ -15,6 +15,8 @@ import hashlib
 
 from services.gpt_service import get_gpt_service
 from common.openai_client import is_openai_available, load_openai_api_key
+from web.db_queries import get_master_topics
+import pandas as pd
 
 # 로거 설정
 logger = logging.getLogger(__name__)
@@ -43,6 +45,69 @@ def load_master_topics(path: str) -> Optional[Dict]:
         return None
     except Exception as e:
         st.error(f"파일 로드 오류: {e}")
+        return None
+
+
+def load_master_topics_from_db() -> Optional[Dict]:
+    """
+    DB에서 마스터 토픽 데이터를 로드하여 JSON 형식으로 변환
+    
+    Returns:
+        Dict: 카테고리별로 그룹화된 토픽 데이터, 실패 시 None
+    """
+    try:
+        # DB에서 모든 마스터 토픽 가져오기
+        df = get_master_topics()
+        
+        if df is None or len(df) == 0:
+            return None
+        
+        # 카테고리별로 그룹화
+        topics_by_category = {}
+        
+        for category in df['category'].dropna().unique():
+            category_df = df[df['category'] == category]
+            topics_list = []
+            
+            for _, row in category_df.iterrows():
+                # JSON 필드 파싱
+                def parse_json_field(value, default):
+                    if pd.isna(value) or value is None:
+                        return default
+                    if isinstance(value, (dict, list)):
+                        return value
+                    if isinstance(value, str):
+                        try:
+                            return json.loads(value)
+                        except:
+                            return default
+                    return default
+                
+                topic = {
+                    'topic_title': row.get('topic_title', ''),
+                    'primary_question': row.get('primary_question', ''),
+                    'related_questions': parse_json_field(row.get('related_questions_json'), []),
+                    'score': float(row.get('score', 0)) if pd.notna(row.get('score')) else 0,
+                    'evidence_score': row.get('evidence_score'),
+                    'why_now': parse_json_field(row.get('why_now_json'), {}),
+                    'blog_angle': row.get('blog_angle', ''),
+                    'social_angle': row.get('social_angle', ''),
+                    'evidence_pack': parse_json_field(row.get('evidence_pack_json'), {}),
+                    'insights': parse_json_field(row.get('insights_json'), {}),
+                    'cluster_size': int(row.get('cluster_size', 0)) if pd.notna(row.get('cluster_size')) else 0,
+                }
+                topics_list.append(topic)
+            
+            # 카테고리명을 JSON 키 형식으로 변환
+            category_key = category
+            topics_by_category[category_key] = topics_list
+        
+        return topics_by_category if topics_by_category else None
+        
+    except Exception as e:
+        logger.error(f"DB에서 마스터 토픽 로드 오류: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         return None
 
 
@@ -431,20 +496,29 @@ def render_master_topics():
         except Exception:
             continue
     
-    if not json_path:
-        st.warning("⚠️ 마스터 토픽 JSON 파일을 찾을 수 없습니다.")
-        st.info("DB에서 마스터 토픽 데이터를 불러오는 기능을 사용하거나, 다음 경로에 파일을 확인해주세요:")
-        for path in possible_paths[:4]:  # 처음 4개만 표시
-            st.text(f"  - {path}")
-        st.info("💡 DB에서 데이터를 불러오려면 'Clustering Results' 탭을 사용해주세요.")
-        return
+    # JSON 파일이 없으면 DB에서 로드 시도
+    topics_data = None
     
-    # JSON 로드
-    topics_data = load_master_topics(json_path)
+    if json_path:
+        # JSON 파일 로드 시도
+        topics_data = load_master_topics(json_path)
     
+    # JSON 파일이 없거나 로드 실패 시 DB에서 로드
     if topics_data is None:
-        st.error("마스터 토픽 데이터를 로드할 수 없습니다.")
-        return
+        st.info("📊 JSON 파일을 찾을 수 없어 DB에서 마스터 토픽 데이터를 불러오는 중...")
+        topics_data = load_master_topics_from_db()
+        
+        if topics_data is None:
+            st.error("❌ 마스터 토픽 데이터를 로드할 수 없습니다.")
+            st.info("다음 사항을 확인해주세요:")
+            st.info("1. DB 연결 상태 확인")
+            st.info("2. topic_qa_briefs 테이블에 데이터가 있는지 확인")
+            st.info("3. 또는 다음 경로에 JSON 파일을 배치해주세요:")
+            for path in possible_paths[:2]:  # 처음 2개만 표시
+                st.text(f"  - {path}")
+            return
+        else:
+            st.success(f"✅ DB에서 {sum(len(v) for v in topics_data.values())}개의 마스터 토픽을 불러왔습니다.")
     
     # 데이터 형식 검증: 각 카테고리가 리스트인지 확인
     if isinstance(topics_data, dict):
