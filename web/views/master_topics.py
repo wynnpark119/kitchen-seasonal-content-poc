@@ -521,13 +521,16 @@ def render_master_topics():
             topics_data = load_master_topics_from_db()
         
         if topics_data is None:
-            st.error("❌ 마스터 토픽 데이터를 로드할 수 없습니다.")
+            # DB 연결 테스트 및 상태 확인
+            db_connected = False
+            table_exists = False
+            record_count = 0
             
-            # DB 연결 테스트
             try:
                 from web.db_queries import get_db_connection
                 conn = get_db_connection()
                 if conn:
+                    db_connected = True
                     st.info("✅ DB 연결은 정상입니다.")
                     # 테이블 존재 여부 확인
                     try:
@@ -540,8 +543,8 @@ def render_master_topics():
                             table_exists = cur.fetchone()[0] > 0
                             if table_exists:
                                 cur.execute("SELECT COUNT(*) FROM topic_qa_briefs")
-                                count = cur.fetchone()[0]
-                                st.info(f"📊 topic_qa_briefs 테이블 존재: {table_exists}, 레코드 수: {count}")
+                                record_count = cur.fetchone()[0]
+                                st.info(f"📊 topic_qa_briefs 테이블 존재: {table_exists}, 레코드 수: {record_count}")
                             else:
                                 st.warning("⚠️ topic_qa_briefs 테이블이 존재하지 않습니다.")
                         conn.close()
@@ -552,13 +555,28 @@ def render_master_topics():
             except Exception as e:
                 st.error(f"DB 연결 테스트 중 오류: {e}")
             
-            st.info("다음 사항을 확인해주세요:")
-            st.info("1. DB 연결 상태 확인")
-            st.info("2. topic_qa_briefs 테이블에 데이터가 있는지 확인")
-            st.info("3. 또는 다음 경로에 JSON 파일을 배치해주세요:")
-            for path in possible_paths[:2]:  # 처음 2개만 표시
-                st.text(f"  - {path}")
-            return
+            # 데이터가 없는 경우 안내
+            if db_connected and table_exists and record_count == 0:
+                st.warning("⚠️ topic_qa_briefs 테이블에 데이터가 없습니다.")
+                st.info("💡 **해결 방법:**")
+                st.info("1. Worker 파이프라인을 실행하여 마스터 토픽 데이터를 생성하세요.")
+                st.info("2. 또는 다음 경로에 JSON 파일을 배치하세요:")
+                for path in possible_paths[:2]:
+                    st.text(f"   - {path}")
+                
+                # 빈 상태 UI 표시
+                st.markdown("---")
+                st.info("📝 현재 데이터가 없어 마스터 토픽을 표시할 수 없습니다.")
+                return
+            else:
+                st.error("❌ 마스터 토픽 데이터를 로드할 수 없습니다.")
+                st.info("다음 사항을 확인해주세요:")
+                st.info("1. DB 연결 상태 확인")
+                st.info("2. topic_qa_briefs 테이블에 데이터가 있는지 확인")
+                st.info("3. 또는 다음 경로에 JSON 파일을 배치해주세요:")
+                for path in possible_paths[:2]:  # 처음 2개만 표시
+                    st.text(f"  - {path}")
+                return
         else:
             total_topics = sum(len(v) for v in topics_data.values())
             st.success(f"✅ DB에서 {total_topics}개의 마스터 토픽을 불러왔습니다. ({len(topics_data)}개 카테고리)")
