@@ -11,8 +11,16 @@ from sqlalchemy import text
 import psycopg2
 
 # SQLAlchemy engine 사용 (커넥션 풀 포함)
+import os
 from common.db import engine
-from common.config import DATABASE_URL
+
+# 환경 변수에서 직접 읽기 (common.config 모듈 로딩 문제 방지)
+DATABASE_URL = (
+    os.getenv("DATABASE_URL") or 
+    os.getenv("RAILWAY_DATABASE_URL") or
+    os.getenv("POSTGRES_URL") or
+    os.getenv("POSTGRES_PRIVATE_URL")
+)
 
 def get_db_connection():
     """
@@ -723,9 +731,74 @@ def check_lg_domain(url: str) -> bool:
     """URL이 LG 도메인인지 확인"""
     if not url:
         return False
-    lg_domains = ['lge.com', 'lg.com', 'lgstory.com', 'lg.co.kr']
+    lg_domains = ['lge.com', 'lg.com', 'lgstory.com', 'lg.co.kr', 'lghs.com']
     url_lower = url.lower()
     return any(domain in url_lower for domain in lg_domains)
+
+def check_competitor_domain(url: str) -> bool:
+    """URL이 경쟁사 도메인인지 확인"""
+    if not url:
+        return False
+    competitor_domains = [
+        'samsung.com', 'samsung.co.kr',
+        'whirlpool.com',
+        'bosch.com', 'bosch-home.com',
+        'electrolux.com',
+        'geappliances.com',
+        'kitchenaid.com',
+        'maytag.com',
+        'frigidaire.com',
+        'haier.com',
+        'miele.com',
+        'subzero-wolf.com',
+        'vikingrange.com'
+    ]
+    url_lower = url.lower()
+    return any(domain in url_lower for domain in competitor_domains)
+
+def classify_channel_type(url: str, domain: str) -> str:
+    """
+    URL을 채널 타입으로 분류
+    Returns: 'lg_owned', 'competitor', 'earned_media', 'other'
+    """
+    if not url or not domain:
+        return 'other'
+    
+    url_lower = url.lower()
+    domain_lower = domain.lower()
+    
+    # 1차 분류: LG Owned
+    if check_lg_domain(url):
+        return 'lg_owned'
+    
+    # 1차 분류: Competitor
+    if check_competitor_domain(url):
+        return 'competitor'
+    
+    # 2차 분류: Earned Media (블로그, 매거진, 미디어 사이트)
+    earned_media_keywords = [
+        'blog', 'magazine', 'media', 'thespruce', 'apartmenttherapy', 
+        'food52', 'bonappetit', 'foodnetwork', 'allrecipes', 'tasteofhome',
+        'hgtv', 'bhg', 'realsimple', 'goodhousekeeping', 'countryliving',
+        'housebeautiful', 'architecturaldigest', 'domino', 'marthastewart',
+        'myrecipes', 'epicurious', 'seriouseats', 'foodandwine'
+    ]
+    
+    if any(keyword in domain_lower or keyword in url_lower for keyword in earned_media_keywords):
+        return 'earned_media'
+    
+    # 2차 분류: Other (포럼, 커뮤니티, Pinterest 등)
+    other_keywords = [
+        'pinterest', 'reddit', 'forum', 'community', 'quora',
+        'answers', 'discussion', 'boards'
+    ]
+    
+    if any(keyword in domain_lower or keyword in url_lower for keyword in other_keywords):
+        return 'other'
+    
+    # 기본값: Earned Media로 분류 (일반적인 웹사이트는 Earned Media로 간주)
+    # ※ 향후 고도화: GPT를 활용한 더 정확한 분류 가능
+    return 'earned_media'
 
 def parse_cited_sources(cited_sources_json: Any) -> List[Dict[str, Any]]:
     """Cited sources JSON 파싱 (리스트 또는 {'sources': [...]} 형식 지원)"""
@@ -763,12 +836,16 @@ def parse_cited_sources(cited_sources_json: Any) -> List[Dict[str, Any]]:
                 except:
                     domain = url.split('/')[2] if len(url.split('/')) > 2 else url
             
+            channel_type = classify_channel_type(url, domain)
             sources.append({
                 'url': url,
                 'domain': domain,
                 'title': source.get('title', ''),
+                'snippet': source.get('snippet', ''),
+                'position': source.get('position', ''),
                 'is_lg': check_lg_domain(url),
-                'type': 'brand' if check_lg_domain(url) else ('media' if any(d in domain for d in ['cnn', 'bbc', 'nytimes']) else 'community')
+                'channel_type': channel_type,  # 'lg_owned', 'competitor', 'earned_media', 'other'
+                'type': 'brand' if check_lg_domain(url) else ('media' if any(d in domain for d in ['cnn', 'bbc', 'nytimes']) else 'community')  # 기존 호환성 유지
             })
     
     return sources
@@ -1006,6 +1083,48 @@ def get_serp_questions_for_master_topic(topic_category: str) -> List[str]:
         import traceback
         traceback.print_exc()
         return []
+    finally:
+        if conn:
+            conn.close()
+
+def get_category_cluster_distribution() -> pd.DataFrame:
+    """
+    카테고리별 클러스터 분포 집계 (Treemap용)
+    clusters 테이블의 size 컬럼을 사용하여 포스트 수 집계
+    
+    Returns:
+        DataFrame with columns: topic_category, cluster_name, post_count, top_keywords
+    """
+    conn = get_db_connection()
+    if conn is None:
+        print("⚠️ get_category_cluster_distribution: DB 연결 실패")
+        return pd.DataFrame()
+    
+    try:
+        query = """
+            SELECT
+                c.topic_category,
+                CASE 
+                    WHEN c.topic_category IS NOT NULL AND c.sub_cluster_index IS NOT NULL 
+                    THEN c.topic_category || '_' || (c.sub_cluster_index + 1)::text
+                    ELSE 'Cluster_' || c.cluster_id::text
+                END as cluster_name,
+                c.size AS post_count,
+                c.top_keywords
+            FROM clusters c
+            WHERE c.noise_label = FALSE
+            AND c.topic_category IS NOT NULL
+            AND c.size > 0
+            ORDER BY c.topic_category, c.size DESC
+        """
+        df = pd.read_sql_query(query, conn)
+        print(f"✅ get_category_cluster_distribution: {len(df)}개 레코드 조회됨")
+        return df
+    except Exception as e:
+        print(f"❌ Error in get_category_cluster_distribution: {e}")
+        import traceback
+        traceback.print_exc()
+        return pd.DataFrame()
     finally:
         if conn:
             conn.close()
