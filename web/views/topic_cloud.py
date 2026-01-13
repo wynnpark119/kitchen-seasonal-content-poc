@@ -147,29 +147,6 @@ def create_wordcloud(keywords_list: List[str] = None, keyword_freq: Dict[str, in
         st.pyplot(fig, use_container_width=True)
         plt.close(fig)
         
-        # 키워드 통계 표시
-        with st.expander("📊 키워드 통계"):
-            top_keywords = keyword_freq.most_common(30)
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                st.markdown("**상위 키워드 (빈도순)**")
-                for keyword, count in top_keywords[:10]:
-                    st.caption(f"• {keyword}: {count}회")
-            
-            with col2:
-                st.markdown("**상위 키워드 (계속)**")
-                for keyword, count in top_keywords[10:20]:
-                    st.caption(f"• {keyword}: {count}회")
-            
-            with col3:
-                st.markdown("**상위 키워드 (계속)**")
-                for keyword, count in top_keywords[20:]:
-                    st.caption(f"• {keyword}: {count}회")
-            
-            st.caption(f"총 고유 키워드 수: {len(keyword_freq)}개")
-            st.caption(f"총 키워드 사용 횟수: {sum(keyword_freq.values())}회")
-        
     except ImportError as e:
         st.error("⚠️ 워드 클라우드 라이브러리가 설치되지 않았습니다.")
         st.info("**로컬 개발 환경에서 설치:**")
@@ -178,15 +155,9 @@ def create_wordcloud(keywords_list: List[str] = None, keyword_freq: Dict[str, in
         st.code("python3 -m pip install wordcloud matplotlib", language="bash")
         st.warning("Railway 배포 환경에서는 requirements.txt를 통해 자동으로 설치됩니다.")
         logger.error(f"Import error: {e}")
-        import traceback
-        with st.expander("상세 오류 보기"):
-            st.code(traceback.format_exc())
     except Exception as e:
         logger.error(f"워드 클라우드 생성 오류: {e}")
         st.error(f"워드 클라우드 생성 중 오류가 발생했습니다: {e}")
-        import traceback
-        with st.expander("상세 오류 보기"):
-            st.code(traceback.format_exc())
 
 
 def collect_all_keywords(clusters_df: pd.DataFrame) -> List[str]:
@@ -233,22 +204,6 @@ def render_topic_cloud():
     if keyword_freq_from_json:
         # JSON 파일에서 로드한 데이터 사용
         create_wordcloud(keyword_freq=keyword_freq_from_json)
-        
-        # JSON 데이터 다운로드 버튼
-        st.markdown("---")
-        json_str = json.dumps({
-            "strategy_note": "Verb-like / abstract terms are downweighted. Concrete nouns relevant to LG HS kitchen content strategy are emphasized.",
-            "adjusted_keyword_frequencies": keyword_freq_from_json,
-            "downweighted_terms": {}
-        }, ensure_ascii=False, indent=2)
-        
-        st.download_button(
-            "📥 데이터셋 다운로드 (JSON)",
-            json_str,
-            "topic_cloud_dataset.json",
-            "application/json",
-            key="download_topic_cloud_json"
-        )
     else:
         # 기존 방식: DB에서 데이터 로드
         clustering_service_instance = clustering_service.get_clustering_service()
@@ -271,72 +226,6 @@ def render_topic_cloud():
             # 전체 키워드로 워드 클라우드 생성
             create_wordcloud(all_keywords)
             
-            # 데이터셋 JSON 다운로드 버튼
-            st.markdown("---")
-            
-            # 다운로드용 데이터 준비
-            # 제외할 키워드 목록
-            excluded_keywords = {'produce'}
-            
-            # 제외할 키워드 필터링 (대소문자 구분 없이)
-            filtered_keywords = [
-                kw for kw in all_keywords 
-                if kw.lower() not in excluded_keywords
-            ]
-            
-            # 키워드 빈도 계산
-            keyword_freq = Counter(filtered_keywords)
-            
-            # lemon 키워드의 빈도를 asparagus와 동일하게 설정
-            asparagus_freq = 0
-            lemon_freq = 0
-            
-            # asparagus 빈도 찾기 (대소문자 구분 없이)
-            for kw, freq in keyword_freq.items():
-                if kw.lower() == 'asparagus':
-                    asparagus_freq = freq
-                elif kw.lower() == 'lemon':
-                    lemon_freq = freq
-            
-            # asparagus가 있고 lemon이 있으면 lemon의 빈도를 asparagus와 동일하게 설정
-            if asparagus_freq > 0:
-                if lemon_freq > 0:
-                    keyword_freq['lemon'] = asparagus_freq
-                else:
-                    keyword_freq['lemon'] = asparagus_freq
-            
-            # JSON 데이터 구조 생성
-            download_data = {
-                "metadata": {
-                    "total_keywords": len(all_keywords),
-                    "unique_keywords": len(set(all_keywords)),
-                    "filtered_keywords": len(filtered_keywords),
-                    "unique_filtered_keywords": len(keyword_freq),
-                    "excluded_keywords": list(excluded_keywords),
-                    "asparagus_frequency": asparagus_freq,
-                    "lemon_frequency": keyword_freq.get('lemon', 0)
-                },
-                "all_keywords": all_keywords,
-                "filtered_keywords": filtered_keywords,
-                "keyword_frequencies": dict(keyword_freq),
-                "top_keywords": dict(keyword_freq.most_common(50))
-            }
-            
-            # JSON 문자열로 변환
-            json_str = json.dumps(download_data, ensure_ascii=False, indent=2)
-            
-            # 다운로드 버튼
-            st.download_button(
-                "📥 데이터셋 다운로드 (JSON)",
-                json_str,
-                "topic_cloud_dataset.json",
-                "application/json",
-                key="download_topic_cloud_json"
-            )
-            
         except Exception as e:
             st.error(f"Error loading topic cloud data: {e}")
-            import traceback
-            with st.expander("상세 오류 보기"):
-                st.code(traceback.format_exc())
             st.info("Not available")
