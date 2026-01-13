@@ -62,15 +62,21 @@ def load_keyword_frequencies_from_json() -> Dict[str, int]:
         return {}
 
 
-def create_interactive_keyword_viz(keywords_list: List[str] = None, keyword_freq: Dict[str, int] = None) -> None:
+def create_wordcloud(keywords_list: List[str] = None, keyword_freq: Dict[str, int] = None, title: str = "Topic Cloud") -> None:
     """
-    인터랙티브한 타원형 키워드 시각화 생성 및 표시
+    타원형 마스크를 사용한 인터랙티브 워드 클라우드 생성 및 표시
     
     Args:
         keywords_list: 키워드 리스트 (옵션, keyword_freq가 없을 때 사용)
         keyword_freq: 키워드 빈도 딕셔너리 (우선 사용)
+        title: 워드 클라우드 제목
     """
     try:
+        from wordcloud import WordCloud
+        import matplotlib.pyplot as plt
+        from PIL import Image
+        import io
+        
         # keyword_freq가 제공되지 않으면 keywords_list에서 계산
         if keyword_freq is None:
             if not keywords_list:
@@ -115,101 +121,62 @@ def create_interactive_keyword_viz(keywords_list: List[str] = None, keyword_freq
             st.info("키워드 빈도 데이터가 없습니다.")
             return
         
-        # 상위 키워드만 선택 (너무 많으면 시각화가 복잡해짐)
-        top_keywords = dict(sorted(keyword_freq.items(), key=lambda x: x[1], reverse=True)[:50])
+        # 타원형 마스크 생성
+        width, height = 1200, 600
+        mask = np.zeros((height, width), dtype=np.uint8)
         
-        # 빈도 정규화 (0-1 범위)
-        max_freq = max(top_keywords.values())
-        min_freq = min(top_keywords.values())
-        freq_range = max_freq - min_freq if max_freq != min_freq else 1
+        # 타원형 마스크 그리기 (중앙에 타원)
+        center_x, center_y = width // 2, height // 2
+        ellipse_width = width * 0.85  # 타원 너비
+        ellipse_height = height * 0.75  # 타원 높이
         
-        # 타원형 레이아웃 생성 (극좌표 사용)
-        keywords = list(top_keywords.keys())
-        frequencies = list(top_keywords.values())
+        y, x = np.ogrid[:height, :width]
+        mask = ((x - center_x) / (ellipse_width / 2))**2 + ((y - center_y) / (ellipse_height / 2))**2 <= 1
+        mask = (~mask).astype(np.uint8) * 255
         
-        # 각도 계산 (타원형 배치)
-        n = len(keywords)
-        angles = np.linspace(0, 2 * np.pi, n, endpoint=False)
+        # 워드 클라우드 생성 (타원형 마스크 사용)
+        wordcloud = WordCloud(
+            width=width,
+            height=height,
+            background_color='#1e1e28',  # 다크 모드 배경
+            colormap='viridis',  # 다크 모드에 잘 보이는 색상 맵
+            max_words=200,
+            relative_scaling=0.5,
+            collocations=False,
+            font_path=None,  # 시스템 기본 폰트 사용
+            prefer_horizontal=0.7,
+            min_font_size=10,
+            max_font_size=120,
+            random_state=42,  # 고정된 랜덤 시드로 매번 동일한 배치
+            mask=mask,  # 타원형 마스크 적용
+            contour_width=0,
+            contour_color='#1e1e28'
+        ).generate_from_frequencies(keyword_freq)
         
-        # 반지름 계산 (빈도에 비례, 타원형으로 만들기 위해 x, y 축 비율 조정)
-        normalized_freqs = [(f - min_freq) / freq_range for f in frequencies]
+        # matplotlib로 이미지 생성
+        fig, ax = plt.subplots(figsize=(14, 7))
+        ax.imshow(wordcloud, interpolation='bilinear')
+        ax.axis('off')
         
-        # 타원형 좌표 생성 (x축을 더 길게)
-        x_coords = []
-        y_coords = []
-        sizes = []
-        texts = []
-        
-        for i, (angle, freq, keyword) in enumerate(zip(angles, frequencies, keywords)):
-            # 타원형 배치 (x축: 1.5배, y축: 1배)
-            radius = 0.3 + normalized_freqs[i] * 0.7  # 0.3 ~ 1.0 범위
-            x = radius * 1.5 * np.cos(angle)
-            y = radius * np.sin(angle)
-            
-            x_coords.append(x)
-            y_coords.append(y)
-            sizes.append(freq * 10 + 8)  # 최소 8, 최대 빈도에 따라 증가
-            texts.append(keyword)
-        
-        # Plotly 인터랙티브 시각화 생성
-        fig = go.Figure()
-        
-        # 키워드별로 scatter plot 추가
-        for i, (x, y, size, text, freq) in enumerate(zip(x_coords, y_coords, sizes, texts, frequencies)):
-            fig.add_trace(go.Scatter(
-                x=[x],
-                y=[y],
-                mode='markers+text',
-                marker=dict(
-                    size=size,
-                    color=freq,
-                    colorscale='Viridis',
-                    showscale=True,
-                    colorbar=dict(title="빈도"),
-                    line=dict(width=1, color='rgba(255, 255, 255, 0.3)')
-                ),
-                text=text,
-                textposition='middle center',
-                textfont=dict(
-                    size=max(10, min(16, size / 3)),
-                    color='white'
-                ),
-                hovertemplate=f'<b>{text}</b><br>빈도: {freq}<extra></extra>',
-                name=text
-            ))
-        
-        # 레이아웃 설정
-        fig.update_layout(
-            title='',
-            xaxis=dict(
-                showgrid=False,
-                zeroline=False,
-                showticklabels=False,
-                range=[-1.2, 1.2]
-            ),
-            yaxis=dict(
-                showgrid=False,
-                zeroline=False,
-                showticklabels=False,
-                range=[-1.2, 1.2],
-                scaleanchor="x",
-                scaleratio=0.67  # 타원형 비율 (y/x = 2/3)
-            ),
-            plot_bgcolor='#1e1e28',
-            paper_bgcolor='#1e1e28',
-            font=dict(color='white'),
-            showlegend=False,
-            height=700,
-            margin=dict(l=0, r=0, t=0, b=0),
-            hovermode='closest'
-        )
+        # 다크 모드 스타일 적용
+        fig.patch.set_facecolor('#1e1e28')
+        ax.set_facecolor('#1e1e28')
         
         # Streamlit에 표시
-        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': True})
+        st.pyplot(fig, use_container_width=True)
+        plt.close(fig)
         
+    except ImportError as e:
+        st.error("⚠️ 워드 클라우드 라이브러리가 설치되지 않았습니다.")
+        st.info("**로컬 개발 환경에서 설치:**")
+        st.code("pip install wordcloud matplotlib pillow", language="bash")
+        st.info("**또는:**")
+        st.code("python3 -m pip install wordcloud matplotlib pillow", language="bash")
+        st.warning("Railway 배포 환경에서는 requirements.txt를 통해 자동으로 설치됩니다.")
+        logger.error(f"Import error: {e}")
     except Exception as e:
-        logger.error(f"인터랙티브 시각화 생성 오류: {e}")
-        st.error(f"시각화 생성 중 오류가 발생했습니다: {e}")
+        logger.error(f"워드 클라우드 생성 오류: {e}")
+        st.error(f"워드 클라우드 생성 중 오류가 발생했습니다: {e}")
 
 
 def collect_all_keywords(clusters_df: pd.DataFrame) -> List[str]:
@@ -255,7 +222,7 @@ def render_topic_cloud():
     
     if keyword_freq_from_json:
         # JSON 파일에서 로드한 데이터 사용
-        create_interactive_keyword_viz(keyword_freq=keyword_freq_from_json)
+        create_wordcloud(keyword_freq=keyword_freq_from_json)
     else:
         # 기존 방식: DB에서 데이터 로드
         clustering_service_instance = clustering_service.get_clustering_service()
@@ -275,8 +242,8 @@ def render_topic_cloud():
                 st.info("키워드 데이터가 없습니다.")
                 return
             
-            # 전체 키워드로 인터랙티브 시각화 생성
-            create_interactive_keyword_viz(all_keywords)
+            # 전체 키워드로 워드 클라우드 생성
+            create_wordcloud(all_keywords)
             
         except Exception as e:
             st.error(f"Error loading topic cloud data: {e}")
