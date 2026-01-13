@@ -171,56 +171,6 @@ def render_topic_cloud():
         
         # 전체 키워드로 워드 클라우드 생성
         create_wordcloud(all_keywords)
-        
-        st.markdown("---")
-        
-        # 카테고리별 통계
-        category_labels = {
-            "SPRING_RECIPES": "Spring Recipes",
-            "SPRING_KITCHEN_STYLING": "Spring Kitchen Styling",
-            "REFRIGERATOR_ORGANIZATION": "Refrigerator Organization",
-            "VEGETABLE_PREP_HANDLING": "Vegetable Prep & Handling"
-        }
-        
-        # 카테고리별 키워드 수집 (통계용)
-        category_keywords = {}
-        for _, row in clusters_df.iterrows():
-            topic_category = row.get('topic_category')
-            if pd.isna(topic_category) or topic_category is None:
-                continue
-            
-            top_keywords = row.get('top_keywords', [])
-            if not top_keywords:
-                continue
-            
-            if isinstance(top_keywords, str):
-                try:
-                    top_keywords = json.loads(top_keywords)
-                except:
-                    continue
-            
-            if not isinstance(top_keywords, list):
-                continue
-            
-            if topic_category not in category_keywords:
-                category_keywords[topic_category] = []
-            category_keywords[topic_category].extend(top_keywords)
-        
-        # 카테고리별 통계 표시
-        if category_keywords:
-            with st.expander("📈 주제별 키워드 통계"):
-                summary_cols = st.columns(len(category_keywords))
-                
-                for idx, (category, keywords) in enumerate(sorted(category_keywords.items())):
-                    with summary_cols[idx]:
-                        keyword_freq = Counter(keywords)
-                        category_label = category_labels.get(category, category.replace("_", " ").title())
-                        
-                        st.metric(
-                            label=category_label,
-                            value=f"{len(keyword_freq)}개",
-                            help=f"고유 키워드 수: {len(keyword_freq)}개\n총 사용 횟수: {sum(keyword_freq.values())}회"
-                        )
             
     except Exception as e:
         st.error(f"Error loading topic cloud data: {e}")
