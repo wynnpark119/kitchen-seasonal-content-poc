@@ -97,8 +97,15 @@ def create_wordcloud(keywords_list: List[str], title: str = "Topic Cloud") -> No
         
     except ImportError as e:
         st.error("⚠️ 워드 클라우드 라이브러리가 설치되지 않았습니다.")
-        st.info("라이브러리 설치 중입니다. 잠시 후 새로고침해주세요.")
+        st.info("**로컬 개발 환경에서 설치:**")
+        st.code("pip install wordcloud matplotlib", language="bash")
+        st.info("**또는:**")
+        st.code("python3 -m pip install wordcloud matplotlib", language="bash")
+        st.warning("Railway 배포 환경에서는 requirements.txt를 통해 자동으로 설치됩니다.")
         logger.error(f"Import error: {e}")
+        import traceback
+        with st.expander("상세 오류 보기"):
+            st.code(traceback.format_exc())
     except Exception as e:
         logger.error(f"워드 클라우드 생성 오류: {e}")
         st.error(f"워드 클라우드 생성 중 오류가 발생했습니다: {e}")
