@@ -17,6 +17,7 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 from web.components import render_insight_card
+from common.file_loader import load_json
 
 
 def normalize_json_data(data: Any) -> Dict[str, List[Dict]]:
@@ -88,9 +89,16 @@ def load_reddit_posts_data(file_path: Path = None) -> Dict[str, List[Dict]]:
     """
     레딧 게시물 데이터 로드
     """
+    # 새로운 방식: 공통 파일 로더 사용 (서버 환경에서도 안정적)
     if file_path is None:
-        file_path = project_root / "data" / "reddit_posts_data.json"
+        data = load_json("reddit_posts_data.json", required=False)
+        if data is None:
+            return {}
+        
+        normalized = normalize_json_data(data)
+        return normalized
     
+    # 기존 방식: 경로 직접 지정 (하위 호환성)
     if not file_path.exists():
         st.warning(f"⚠️ JSON 파일을 찾을 수 없습니다: {file_path}")
         st.info(f"💡 파일 경로를 확인해주세요: `{file_path}`")
