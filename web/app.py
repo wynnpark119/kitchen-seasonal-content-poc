@@ -127,7 +127,7 @@ with st.sidebar:
         ("reddit_analysis", "• Reddit 토픽 분석"),
         ("topic_cloud", "• Topic Cloud"),
         ("ai_overview", "• AI 오버뷰 분석"),
-        ("master_topics", "• 마스터 토픽 제안"),
+        ("master_topics", "• LG전자 HS 마스터 토픽 제안"),
         ("keyword_trends", "• 키워드 트렌드")
     ]
     
