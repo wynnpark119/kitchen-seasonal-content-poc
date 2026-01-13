@@ -162,10 +162,35 @@ with st.sidebar:
             align-items: center !important;
         }
         
+        /* 버튼 내부 모든 텍스트 요소 좌측 정렬 */
+        [data-testid="stSidebar"] .stButton > button * {
+            text-align: left !important;
+            justify-content: flex-start !important;
+        }
+        
         /* 텍스트 좌측 정렬 강제 */
         [data-testid="stSidebar"] .stButton > button > div {
             text-align: left !important;
             width: 100% !important;
+            display: flex !important;
+            justify-content: flex-start !important;
+            align-items: center !important;
+        }
+        
+        /* 버튼 내부 모든 요소 좌측 정렬 강제 */
+        [data-testid="stSidebar"] .stButton > button > div > p,
+        [data-testid="stSidebar"] .stButton > button > div > span,
+        [data-testid="stSidebar"] .stButton > button > div > div {
+            text-align: left !important;
+            justify-content: flex-start !important;
+            display: flex !important;
+            width: 100% !important;
+        }
+        
+        /* 버튼 자체도 좌측 정렬 강제 */
+        [data-testid="stSidebar"] .stButton > button {
+            justify-content: flex-start !important;
+            text-align: left !important;
         }
         
         [data-testid="stSidebar"] .stButton > button:hover {
