@@ -6,6 +6,7 @@ data/
 !data/trends_2025.json
 !data/topic_cloud_keywords.json
 !data/reddit_posts_data.json
+!data/keyword_msv_table.json
 # clustering_results.json은 포함 (레딧 수집 현황에서 사용)
 __pycache__/
 *.pyc

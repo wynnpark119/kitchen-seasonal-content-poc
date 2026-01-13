@@ -1,0 +1,718 @@
+{
+  "generated_at": "2026-01-12T16:50:00.000000",
+  "source": "manual_table",
+  "notes": "MSV 기반으로 Reddit 수집 키워드를 선정했다. kitchen organization ideas, kitchen styling ideas 등은 검색량이 매우 높아 고객의 주방 관련 관심이 '레시피'뿐 아니라 '정리/스타일링/운영'까지 확장되어 있음을 보여준다.",
+  "items": [
+    {
+      "major_category": "Spring Recipe & Cooking",
+      "minor_category": "Recipe / Idea",
+      "keyword": "spring dinner recipes",
+      "msv_google_worldwide": 9900,
+      "msv_perplexity": 1700,
+      "aio": false,
+      "remark": "- 상위노출 대부분 recipe 사이트로 다양한 레시피 링크를 모아둔 결과가 많음\n- 숫자+spring recipe 등의 콘텐츠 다수 노출\n- simple, idea 와 같은 키워드와 자주 등장 (AIO 잘 Trigger 되지 않는 키워드)"
+    },
+    {
+      "major_category": "Spring Recipe & Cooking",
+      "minor_category": "Recipe / Idea",
+      "keyword": "spring supper recipes",
+      "msv_google_worldwide": 9900,
+      "msv_perplexity": 1700,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Recipe & Cooking",
+      "minor_category": "Recipe / Idea",
+      "keyword": "spring recipes",
+      "msv_google_worldwide": 8100,
+      "msv_perplexity": 1400,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Recipe & Cooking",
+      "minor_category": "Recipe / Idea",
+      "keyword": "spring salad recipe",
+      "msv_google_worldwide": 4400,
+      "msv_perplexity": 750,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Recipe & Cooking",
+      "minor_category": "Recipe / Idea",
+      "keyword": "spring salad recipes",
+      "msv_google_worldwide": 4400,
+      "msv_perplexity": 750,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Recipe & Cooking",
+      "minor_category": "Recipe / Idea",
+      "keyword": "spring mix salad recipe",
+      "msv_google_worldwide": 3600,
+      "msv_perplexity": 610,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Recipe & Cooking",
+      "minor_category": "Recipe / Idea",
+      "keyword": "spring dessert recipes",
+      "msv_google_worldwide": 2900,
+      "msv_perplexity": 490,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Recipe & Cooking",
+      "minor_category": "Recipe / Idea",
+      "keyword": "spring soup recipes",
+      "msv_google_worldwide": 1900,
+      "msv_perplexity": 320,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Recipe & Cooking",
+      "minor_category": "Recipe / Idea",
+      "keyword": "easy spring dinner recipes",
+      "msv_google_worldwide": 1000,
+      "msv_perplexity": 170,
+      "aio": true,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Recipe & Cooking",
+      "minor_category": "Recipe / Idea",
+      "keyword": "healthy spring recipes",
+      "msv_google_worldwide": 1000,
+      "msv_perplexity": 170,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Recipe & Cooking",
+      "minor_category": "Recipe / Idea",
+      "keyword": "spring lunch ideas",
+      "msv_google_worldwide": 880,
+      "msv_perplexity": 150,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Recipe & Cooking",
+      "minor_category": "Recipe / Idea",
+      "keyword": "easy spring recipes",
+      "msv_google_worldwide": 880,
+      "msv_perplexity": 150,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Recipe & Cooking",
+      "minor_category": "Recipe / Idea",
+      "keyword": "Best spring recipes",
+      "msv_google_worldwide": 480,
+      "msv_perplexity": 80,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Recipe & Cooking",
+      "minor_category": "Recipe / Idea",
+      "keyword": "spring vegetable recipes",
+      "msv_google_worldwide": 1600,
+      "msv_perplexity": 270,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Recipe & Cooking",
+      "minor_category": "Ingredients",
+      "keyword": "spring vegetables",
+      "msv_google_worldwide": 9900,
+      "msv_perplexity": 1700,
+      "aio": true,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Recipe & Cooking",
+      "minor_category": "Ingredients",
+      "keyword": "spring fruits",
+      "msv_google_worldwide": 6600,
+      "msv_perplexity": 1100,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Recipe & Cooking",
+      "minor_category": "Ingredients",
+      "keyword": "spring herbs",
+      "msv_google_worldwide": 720,
+      "msv_perplexity": 120,
+      "aio": true,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Recipe & Cooking",
+      "minor_category": "Ingredients",
+      "keyword": "spring seasonal produce",
+      "msv_google_worldwide": 480,
+      "msv_perplexity": 80,
+      "aio": true,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Recipe & Cooking",
+      "minor_category": "Ingredients",
+      "keyword": "popular spring foods",
+      "msv_google_worldwide": 140,
+      "msv_perplexity": 20,
+      "aio": true,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Recipe & Cooking",
+      "minor_category": "Ingredients",
+      "keyword": "Spring Seasonal Ingredients",
+      "msv_google_worldwide": 90,
+      "msv_perplexity": 20,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Recipe & Cooking",
+      "minor_category": "Ingredients",
+      "keyword": "spring seafood",
+      "msv_google_worldwide": 90,
+      "msv_perplexity": 20,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Recipe & Cooking",
+      "minor_category": "Ingredients",
+      "keyword": "fresh spring food",
+      "msv_google_worldwide": 10,
+      "msv_perplexity": 10,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Recipe & Cooking",
+      "minor_category": "Ingredients",
+      "keyword": "seasonal spring fruit",
+      "msv_google_worldwide": 4400,
+      "msv_perplexity": 750,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Recipe & Cooking",
+      "minor_category": "Ingredients",
+      "keyword": "spring fruits in season",
+      "msv_google_worldwide": 4400,
+      "msv_perplexity": 750,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Recipe & Cooking",
+      "minor_category": "Ingredients",
+      "keyword": "what is in season for spring",
+      "msv_google_worldwide": null,
+      "msv_perplexity": 10,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Recipe & Cooking",
+      "minor_category": "기타",
+      "keyword": "one-pan spring recipes",
+      "msv_google_worldwide": 480,
+      "msv_perplexity": 80,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Recipe & Cooking",
+      "minor_category": "기타",
+      "keyword": "spring picnic food",
+      "msv_google_worldwide": 210,
+      "msv_perplexity": 40,
+      "aio": true,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Recipe & Cooking",
+      "minor_category": "기타",
+      "keyword": "spring diet recipes",
+      "msv_google_worldwide": null,
+      "msv_perplexity": 10,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Kitchen Interior & Décor",
+      "minor_category": "Décor",
+      "keyword": "kitchen styling ideas",
+      "msv_google_worldwide": 110000,
+      "msv_perplexity": 18700,
+      "aio": true,
+      "remark": "- Kitchen décor 보다는 home décor로 자주 등장\n- kitchen 한정으로는 시즈널리티가 아닌 형태(e.g. I자형 주방, L자형 주방 등)의 검색어 다수"
+    },
+    {
+      "major_category": "Spring Kitchen Interior & Décor",
+      "minor_category": "Décor",
+      "keyword": "spring kitchen",
+      "msv_google_worldwide": 5400,
+      "msv_perplexity": 920,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Kitchen Interior & Décor",
+      "minor_category": "Décor",
+      "keyword": "spring kitchen decor",
+      "msv_google_worldwide": 320,
+      "msv_perplexity": 50,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Kitchen Interior & Décor",
+      "minor_category": "Décor",
+      "keyword": "easy kitchen update",
+      "msv_google_worldwide": 210,
+      "msv_perplexity": 40,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Kitchen Interior & Décor",
+      "minor_category": "Décor",
+      "keyword": "spring kitchen curtains",
+      "msv_google_worldwide": 170,
+      "msv_perplexity": 30,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Kitchen Interior & Décor",
+      "minor_category": "Décor",
+      "keyword": "spring kitchen decorating ideas",
+      "msv_google_worldwide": 140,
+      "msv_perplexity": 20,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Kitchen Interior & Décor",
+      "minor_category": "Décor",
+      "keyword": "spring kitchen decor ideas",
+      "msv_google_worldwide": 140,
+      "msv_perplexity": 20,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Kitchen Interior & Décor",
+      "minor_category": "Décor",
+      "keyword": "kitchen spring decor",
+      "msv_google_worldwide": 50,
+      "msv_perplexity": 10,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Kitchen Interior & Décor",
+      "minor_category": "Décor",
+      "keyword": "spring decor for kitchen",
+      "msv_google_worldwide": 30,
+      "msv_perplexity": 10,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Kitchen Interior & Décor",
+      "minor_category": "Décor",
+      "keyword": "spring home styling",
+      "msv_google_worldwide": 10,
+      "msv_perplexity": 10,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Kitchen Interior & Décor",
+      "minor_category": "Décor",
+      "keyword": "spring kitchen makeover",
+      "msv_google_worldwide": null,
+      "msv_perplexity": 10,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Kitchen Interior & Décor",
+      "minor_category": "Décor",
+      "keyword": "seasonal kitchen styling",
+      "msv_google_worldwide": null,
+      "msv_perplexity": 10,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Kitchen Interior & Décor",
+      "minor_category": "Décor",
+      "keyword": "Small Kitchen Refresh",
+      "msv_google_worldwide": null,
+      "msv_perplexity": 10,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Kitchen Interior & Décor",
+      "minor_category": "Décor",
+      "keyword": "small kitchen refresh ideas",
+      "msv_google_worldwide": null,
+      "msv_perplexity": 10,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Kitchen Interior & Décor",
+      "minor_category": "Décor",
+      "keyword": "spring kitchen linen",
+      "msv_google_worldwide": null,
+      "msv_perplexity": 10,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Kitchen Interior & Décor",
+      "minor_category": "Décor",
+      "keyword": "spring kitchen fabric",
+      "msv_google_worldwide": null,
+      "msv_perplexity": 10,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Kitchen Interior & Décor",
+      "minor_category": "Décor",
+      "keyword": "spring kitchen refresh",
+      "msv_google_worldwide": null,
+      "msv_perplexity": 10,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Kitchen Interior & Décor",
+      "minor_category": "Décor",
+      "keyword": "budget kitchen decor",
+      "msv_google_worldwide": null,
+      "msv_perplexity": 10,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Kitchen Interior & Décor",
+      "minor_category": "Cleaning",
+      "keyword": "kitchen spring cleaning",
+      "msv_google_worldwide": 110,
+      "msv_perplexity": 20,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Spring Kitchen Interior & Décor",
+      "minor_category": "Color",
+      "keyword": "spring kitchen color palette",
+      "msv_google_worldwide": null,
+      "msv_perplexity": 10,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Kitchen Hacks",
+      "minor_category": "Space / Small Kitchen",
+      "keyword": "small kitchen hacks",
+      "msv_google_worldwide": 720,
+      "msv_perplexity": 120,
+      "aio": true,
+      "remark": ""
+    },
+    {
+      "major_category": "Kitchen Hacks",
+      "minor_category": "Space / Small Kitchen",
+      "keyword": "tiny kitchen tips",
+      "msv_google_worldwide": 20,
+      "msv_perplexity": 10,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Kitchen Hacks",
+      "minor_category": "Refrigerator",
+      "keyword": "kitchen organization ideas",
+      "msv_google_worldwide": 135000,
+      "msv_perplexity": 23000,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Kitchen Hacks",
+      "minor_category": "Refrigerator",
+      "keyword": "fridge storage ideas",
+      "msv_google_worldwide": 1600,
+      "msv_perplexity": 270,
+      "aio": true,
+      "remark": ""
+    },
+    {
+      "major_category": "Kitchen Hacks",
+      "minor_category": "Refrigerator",
+      "keyword": "fridge hacks",
+      "msv_google_worldwide": 1000,
+      "msv_perplexity": 170,
+      "aio": true,
+      "remark": ""
+    },
+    {
+      "major_category": "Kitchen Hacks",
+      "minor_category": "Refrigerator",
+      "keyword": "fridge organization hacks",
+      "msv_google_worldwide": 480,
+      "msv_perplexity": 80,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Kitchen Hacks",
+      "minor_category": "Refrigerator",
+      "keyword": "refrigerator tips",
+      "msv_google_worldwide": 140,
+      "msv_perplexity": 20,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Kitchen Hacks",
+      "minor_category": "Refrigerator",
+      "keyword": "spring refrigerator cleaning",
+      "msv_google_worldwide": null,
+      "msv_perplexity": 10,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Kitchen Hacks",
+      "minor_category": "Budget",
+      "keyword": "budget kitchen hacks",
+      "msv_google_worldwide": null,
+      "msv_perplexity": 10,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Kitchen Hacks",
+      "minor_category": "Food Prep / Cooking Tips",
+      "keyword": "easy meal prep",
+      "msv_google_worldwide": 33100,
+      "msv_perplexity": 5600,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Kitchen Hacks",
+      "minor_category": "Food Prep / Cooking Tips",
+      "keyword": "cooking hacks",
+      "msv_google_worldwide": 27100,
+      "msv_perplexity": 4600,
+      "aio": true,
+      "remark": ""
+    },
+    {
+      "major_category": "Kitchen Hacks",
+      "minor_category": "Food Prep / Cooking Tips",
+      "keyword": "Refrigerator Organization",
+      "msv_google_worldwide": 9900,
+      "msv_perplexity": 1700,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Kitchen Hacks",
+      "minor_category": "Food Prep / Cooking Tips",
+      "keyword": "weekly food prep ideas",
+      "msv_google_worldwide": 8100,
+      "msv_perplexity": 1400,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Kitchen Hacks",
+      "minor_category": "Food Prep / Cooking Tips",
+      "keyword": "food waste reduction tips",
+      "msv_google_worldwide": 1300,
+      "msv_perplexity": 220,
+      "aio": true,
+      "remark": ""
+    },
+    {
+      "major_category": "Kitchen Hacks",
+      "minor_category": "Food Prep / Cooking Tips",
+      "keyword": "meal prep hacks",
+      "msv_google_worldwide": 720,
+      "msv_perplexity": 120,
+      "aio": true,
+      "remark": ""
+    },
+    {
+      "major_category": "Kitchen Hacks",
+      "minor_category": "Food Prep / Cooking Tips",
+      "keyword": "food prep hacks",
+      "msv_google_worldwide": 170,
+      "msv_perplexity": 30,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Kitchen Hacks",
+      "minor_category": "Food Prep / Cooking Tips",
+      "keyword": "using leftovers",
+      "msv_google_worldwide": 90,
+      "msv_perplexity": 20,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Kitchen Hacks",
+      "minor_category": "Food Prep / Cooking Tips",
+      "keyword": "kitchen prep tips",
+      "msv_google_worldwide": 40,
+      "msv_perplexity": 10,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Kitchen Hacks",
+      "minor_category": "Food Prep / Cooking Tips",
+      "keyword": "meal prep routines",
+      "msv_google_worldwide": 10,
+      "msv_perplexity": 10,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Kitchen Hacks",
+      "minor_category": "Storage / Freshness",
+      "keyword": "kitchen storage hacks",
+      "msv_google_worldwide": 2400,
+      "msv_perplexity": 410,
+      "aio": true,
+      "remark": ""
+    },
+    {
+      "major_category": "Kitchen Hacks",
+      "minor_category": "Storage / Freshness",
+      "keyword": "food storage tips",
+      "msv_google_worldwide": 880,
+      "msv_perplexity": 150,
+      "aio": true,
+      "remark": ""
+    },
+    {
+      "major_category": "Kitchen Hacks",
+      "minor_category": "Storage / Freshness",
+      "keyword": "how to keep vegetables fresh",
+      "msv_google_worldwide": 590,
+      "msv_perplexity": 100,
+      "aio": true,
+      "remark": ""
+    },
+    {
+      "major_category": "Kitchen Hacks",
+      "minor_category": "Storage / Freshness",
+      "keyword": "food storage hacks",
+      "msv_google_worldwide": 260,
+      "msv_perplexity": 40,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Kitchen Hacks",
+      "minor_category": "Storage / Freshness",
+      "keyword": "kitchen storage tips",
+      "msv_google_worldwide": 170,
+      "msv_perplexity": 30,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Kitchen Hacks",
+      "minor_category": "Storage / Freshness",
+      "keyword": "vegetable storage tips",
+      "msv_google_worldwide": 70,
+      "msv_perplexity": 10,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Kitchen Hacks",
+      "minor_category": "Storage / Freshness",
+      "keyword": "keep food fresh longer",
+      "msv_google_worldwide": 40,
+      "msv_perplexity": 10,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Kitchen Hacks",
+      "minor_category": "Storage / Freshness",
+      "keyword": "spring produce storage",
+      "msv_google_worldwide": null,
+      "msv_perplexity": 10,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Kitchen Hacks",
+      "minor_category": "Organization / Cleaning",
+      "keyword": "kitchen organization tips",
+      "msv_google_worldwide": 4400,
+      "msv_perplexity": 750,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Kitchen Hacks",
+      "minor_category": "Organization / Cleaning",
+      "keyword": "kitchen cleaning hacks",
+      "msv_google_worldwide": 4400,
+      "msv_perplexity": 750,
+      "aio": true,
+      "remark": ""
+    },
+    {
+      "major_category": "Kitchen Hacks",
+      "minor_category": "Organization / Cleaning",
+      "keyword": "natural kitchen cleaning",
+      "msv_google_worldwide": 390,
+      "msv_perplexity": 70,
+      "aio": false,
+      "remark": ""
+    },
+    {
+      "major_category": "Kitchen Hacks",
+      "minor_category": "Organization / Cleaning",
+      "keyword": "easy kitchen cleaning tips",
+      "msv_google_worldwide": 90,
+      "msv_perplexity": 20,
+      "aio": false,
+      "remark": ""
+    }
+  ]
+}
