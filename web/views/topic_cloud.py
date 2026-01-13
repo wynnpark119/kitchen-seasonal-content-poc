@@ -246,5 +246,10 @@ def render_topic_cloud():
             create_wordcloud(all_keywords)
             
         except Exception as e:
-            st.error(f"Error loading topic cloud data: {e}")
-            st.info("Not available")
+            logger.error(f"Error loading topic cloud data: {e}", exc_info=True)
+            st.error(f"⚠️ 토픽 클라우드 데이터를 불러오는 중 오류가 발생했습니다.")
+            st.error(f"오류 상세: {str(e)}")
+            st.info("💡 다음을 확인해주세요:")
+            st.info("1. 데이터베이스 연결 상태 확인")
+            st.info("2. 클러스터링 데이터가 있는지 확인")
+            st.info(f"3. 또는 {get_data_dir() / 'topic_cloud_keywords.json'} 파일이 있는지 확인")
