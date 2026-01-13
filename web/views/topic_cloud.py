@@ -40,8 +40,21 @@ def create_wordcloud(keywords_list: List[str], title: str = "Topic Cloud") -> No
             st.info("키워드가 없습니다.")
             return
         
+        # 제외할 키워드 목록
+        excluded_keywords = {'produce'}
+        
+        # 제외할 키워드 필터링 (대소문자 구분 없이)
+        filtered_keywords = [
+            kw for kw in keywords_list 
+            if kw.lower() not in excluded_keywords
+        ]
+        
+        if not filtered_keywords:
+            st.info("필터링 후 키워드가 없습니다.")
+            return
+        
         # 키워드 빈도 계산
-        keyword_freq = Counter(keywords_list)
+        keyword_freq = Counter(filtered_keywords)
         
         # 워드 클라우드 생성
         wordcloud = WordCloud(
