@@ -5,22 +5,73 @@ Clustering Results 뷰
 """
 import streamlit as st
 import pandas as pd
-from typing import Optional
 import importlib
 import sys
-import plotly.express as px
-import plotly.graph_objects as go
-import numpy as np
+import logging
 
 # 모듈 재로드를 위해 import
 from services import clustering_service
 from services.gpt_service import get_gpt_service
 from common.openai_client import is_openai_available
-from web.db_queries import get_category_cluster_distribution
+
+# 로거 설정
+logger = logging.getLogger(__name__)
 
 # Streamlit 모듈 캐싱 문제 해결: 모듈 재로드
 if 'services.clustering_service' in sys.modules:
     importlib.reload(clustering_service)
+
+
+def render_cluster_detail(cluster_row: pd.Series, gpt_service):
+    """클러스터 상세 정보 렌더링"""
+    cluster_id = cluster_row['cluster_id']
+    cluster_id_str = str(cluster_id)
+    cluster_name = cluster_row.get('cluster_name', f"Cluster_{cluster_id}")
+    topic_category = cluster_row.get('topic_category')
+    
+    if pd.isna(topic_category) or topic_category is None:
+        topic_category_display = 'Unknown'
+    else:
+        topic_category_display = topic_category
+    
+    size = cluster_row.get('size', 0)
+    sub_cluster_index = cluster_row.get('sub_cluster_index')
+    top_keywords = cluster_row.get('top_keywords', [])
+    if not isinstance(top_keywords, list):
+        top_keywords = []
+    
+    # 요약 표시 (Cluster ID와 Size 메트릭 제거)
+    summary = cluster_row.get('summary', '')
+    if summary:
+        st.markdown("**클러스터 개요**")
+        st.caption(summary)
+    
+    # GPT 요약 (선택적)
+    try:
+        if is_openai_available() and st.checkbox("GPT로 추가 요약 생성", key=f"gpt_summary_{cluster_id_str}"):
+            with st.spinner("GPT로 클러스터 요약 생성 중..."):
+                gpt_summary = gpt_service.generate_cluster_summary(
+                    cluster_id_str,
+                    top_keywords[:10] if top_keywords else [],
+                    int(size),
+                    topic_category_display if topic_category_display != 'Unknown' else 'Unknown'
+                )
+                if gpt_summary:
+                    st.markdown("**🤖 GPT 요약:**")
+                    st.success(gpt_summary)
+                else:
+                    st.info("요약을 생성할 수 없습니다.")
+    except Exception as gpt_error:
+        # GPT 실패 시 에러 메시지 표시 (조용히 실패)
+        pass
+    
+    # Top Keywords
+    if top_keywords:
+        st.markdown("**주요 키워드**")
+        keywords_str = ", ".join(top_keywords[:20])
+        st.caption(keywords_str)
+        if len(top_keywords) > 20:
+            st.caption(f"총 {len(top_keywords)}개 키워드 중 상위 20개 표시")
 
 
 def render_clustering_results():
@@ -37,295 +88,369 @@ def render_clustering_results():
             st.info("클러스터링이 완료되면 결과가 표시됩니다.")
             return
         
-        # ========================================================================
-        # 📌 카테고리별 포스트 분포 & 클러스터 주제 시각화 섹션
-        # ========================================================================
-        st.markdown("### 📌 카테고리별 포스트 분포 & 클러스터 주제")
-        
-        try:
-            # clusters_df를 직접 사용하여 Treemap 데이터 생성 (아래 클러스터링 결과와 동일한 데이터 소스)
-            if len(clusters_df) > 0 and 'topic_category' in clusters_df.columns:
-                # clusters_df에서 필요한 데이터 생성
-                dist_data = []
-                for _, row in clusters_df.iterrows():
-                    if pd.notna(row.get('topic_category')) and row.get('size', 0) > 0:
-                        cluster_name = row.get('cluster_name')
-                        if not cluster_name:
-                            # cluster_name이 없으면 생성
-                            topic_category = row.get('topic_category')
-                            sub_cluster_index = row.get('sub_cluster_index')
-                            if pd.notna(sub_cluster_index):
-                                cluster_name = f"{topic_category}_{int(sub_cluster_index) + 1}"
-                            else:
-                                cluster_name = f"Cluster_{row.get('cluster_id', '')}"
-                        
-                        dist_data.append({
-                            'topic_category': row.get('topic_category'),
-                            'cluster_name': cluster_name,
-                            'post_count': int(row.get('size', 0)),
-                            'top_keywords': row.get('top_keywords', []),
-                            'summary': row.get('summary', ''),
-                            'cluster_id': row.get('cluster_id')
-                        })
-                dist_df = pd.DataFrame(dist_data)
-            else:
-                dist_df = pd.DataFrame()
-            
-            if len(dist_df) == 0:
-                st.warning("⚠️ 카테고리별 클러스터 분포 데이터가 없습니다.")
-            else:
-                # Treemap 데이터 준비
-                st.markdown("#### 카테고리별 클러스터 비중 Treemap")
-                
-                # Treemap용 계층 구조 데이터 생성
-                treemap_data = []
-                keywords_map = {}  # 클러스터명 -> 전체 키워드 매핑 (hover용)
-                summary_map = {}  # 클러스터명 -> 요약 매핑 (hover용)
-                
-                # 먼저 클러스터 레벨 추가
-                for _, row in dist_df.iterrows():
-                    cluster_name = row['cluster_name']
-                    top_keywords = row.get('top_keywords', [])
-                    summary = row.get('summary', '')
-                    
-                    # 차트에 표시할 키워드 (상위 5개만)
-                    keywords_list_display = []
-                    # hover용 전체 키워드 (최대 20개)
-                    keywords_list_full = []
-                    
-                    if top_keywords:
-                        if isinstance(top_keywords, list):
-                            keywords_list_display = top_keywords[:5]
-                            keywords_list_full = top_keywords[:20]  # hover용 전체 키워드
-                        elif isinstance(top_keywords, str):
-                            # JSON 문자열인 경우 파싱 시도
-                            try:
-                                import json
-                                parsed = json.loads(top_keywords)
-                                if isinstance(parsed, list):
-                                    keywords_list_display = parsed[:5]
-                                    keywords_list_full = parsed[:20]
-                            except:
-                                pass
-                    
-                    # 차트에 표시할 키워드 (상위 5개)
-                    keywords_str_display = ', '.join(keywords_list_display) if keywords_list_display else ""
-                    # hover용 전체 키워드
-                    keywords_str_full = ', '.join(keywords_list_full) if keywords_list_full else ""
-                    
-                    # 키워드 매핑 저장 (hover용 - 전체 키워드)
-                    keywords_map[cluster_name] = keywords_str_full
-                    
-                    # 요약 매핑 저장 (hover용 - 전체 요약)
-                    if summary and pd.notna(summary) and str(summary).strip():
-                        summary_str = str(summary).strip()
-                        # hover에는 전체 요약 표시
-                        summary_map[cluster_name] = summary_str
-                    else:
-                        summary_map[cluster_name] = ""
-                    
-                    # 차트에 표시할 텍스트: 클러스터명 + 키워드 (상위 5개)
-                    if keywords_str_display:
-                        display_text = f"{cluster_name}<br><span style='font-size:0.85em;'>{keywords_str_display}</span>"
-                    else:
-                        display_text = cluster_name
-                    
-                    treemap_data.append({
-                        'labels': cluster_name,  # 기본 레이블
-                        'parents': row['topic_category'],
-                        'values': row['post_count'],
-                        'cluster_name': cluster_name,  # 원본 클러스터명 저장
-                        'display_text': display_text  # 표시용 텍스트
-                    })
-                
-                # 카테고리 레벨 추가 (중복 제거)
-                unique_categories = dist_df['topic_category'].unique()
-                for cat in unique_categories:
-                    treemap_data.append({
-                        'labels': cat,
-                        'parents': '',
-                        'values': 0,  # 자동 계산됨
-                        'display_text': cat
-                    })
-                
-                # DataFrame 생성 및 정리
-                treemap_df = pd.DataFrame(treemap_data)
-                # 카테고리 레벨의 values는 자식들의 합으로 계산
-                category_totals = treemap_df[treemap_df['parents'] != ''].groupby('parents')['values'].sum()
-                for cat in category_totals.index:
-                    treemap_df.loc[
-                        (treemap_df['labels'] == cat) & (treemap_df['parents'] == ''),
-                        'values'
-                    ] = category_totals[cat]
-                
-                # Treemap 생성 (커스텀 hover 템플릿)
-                # hover 템플릿을 위한 데이터 준비
-                hover_texts = []
-                # 카테고리별 총합 계산
-                category_totals_dict = {}
-                for cat in unique_categories:
-                    cat_total = dist_df[dist_df['topic_category'] == cat]['post_count'].sum()
-                    category_totals_dict[cat] = cat_total
-                
-                for idx, row in treemap_df.iterrows():
-                    parent = row['parents']
-                    value = row['values']
-                    
-                    if row.get('cluster_name') and row['cluster_name'] in keywords_map:
-                        cluster_name = row['cluster_name']
-                        keywords = keywords_map.get(cluster_name, "")
-                        summary = summary_map.get(cluster_name, "")
-                        
-                        # 비중 계산
-                        if parent and parent in category_totals_dict and category_totals_dict[parent] > 0:
-                            percent = (value / category_totals_dict[parent]) * 100
-                            hover_text = f"<b>{cluster_name}</b><br>"
-                            hover_text += f"포스트: {value}개 | 비중: {percent:.1f}%<br>"
-                            if keywords:
-                                # 키워드를 한 줄로 표시 (최대 10개)
-                                keywords_list = keywords.split(', ')[:10]
-                                keywords_short = ', '.join(keywords_list)
-                                hover_text += f"키워드: {keywords_short}"
-                                if len(keywords.split(', ')) > 10:
-                                    hover_text += "..."
-                            if summary:
-                                # 요약을 한 줄로 표시 (최대 80자)
-                                summary_short = summary[:80] + '...' if len(summary) > 80 else summary
-                                hover_text += f"<br>요약: {summary_short}"
-                        else:
-                            hover_text = f"<b>{cluster_name}</b><br>"
-                            hover_text += f"포스트: {value}개<br>"
-                            if keywords:
-                                keywords_list = keywords.split(', ')[:10]
-                                keywords_short = ', '.join(keywords_list)
-                                hover_text += f"키워드: {keywords_short}"
-                                if len(keywords.split(', ')) > 10:
-                                    hover_text += "..."
-                            if summary:
-                                summary_short = summary[:80] + '...' if len(summary) > 80 else summary
-                                hover_text += f"<br>요약: {summary_short}"
-                    else:
-                        # 카테고리 레벨
-                        hover_text = f"<b>{row['labels']}</b><br>포스트: {value}개"
-                    hover_texts.append(hover_text)
-                
-                fig_treemap = go.Figure(go.Treemap(
-                    labels=treemap_df['labels'].tolist(),
-                    parents=treemap_df['parents'].tolist(),
-                    values=treemap_df['values'].tolist(),
-                    branchvalues="total",
-                    hovertemplate='%{hovertext}<extra></extra>',
-                    hovertext=hover_texts,
-                    text=treemap_df['display_text'].tolist(),  # 커스텀 텍스트 (클러스터명 + 키워드)
-                    textinfo="text",  # 커스텀 텍스트만 표시
-                    textfont=dict(size=11),
-                    textposition="middle center",
-                    marker=dict(
-                        colorscale='Viridis',
-                        cmid=treemap_df['values'].median(),
-                        line=dict(width=2, color='white')  # 구분선 추가
-                    )
-                ))
-                
-                fig_treemap.update_layout(
-                    height=700,
-                    title="카테고리별 클러스터 비중",
-                    font=dict(size=12),
-                    margin=dict(l=10, r=10, t=50, b=10)
-                )
-                
-                st.plotly_chart(fig_treemap, use_container_width=True)
-        except Exception as e:
-            st.warning(f"⚠️ 시각화 데이터를 불러오는 중 오류가 발생했습니다: {e}")
-            import traceback
-            traceback.print_exc()
-        
-        st.markdown("---")
-        
-        # 카테고리 필터
+        # 카테고리별로 그룹화
         categories = clusters_df['topic_category'].dropna().unique()
         available_categories = sorted([cat for cat in categories if pd.notna(cat)])
         
-        if available_categories:
-            selected_category = st.selectbox(
+        if not available_categories:
+            st.info("카테고리 데이터가 없습니다.")
+            return
+        
+        # 카테고리 필터 드롭박스
+        category_labels = {cat: cat.replace("_", " ").title() for cat in available_categories}
+        category_options = [category_labels[cat] for cat in available_categories]
+        
+        # 세션 상태에서 선택된 카테고리 가져오기 (없으면 첫 번째 카테고리)
+        if 'selected_category' not in st.session_state:
+            st.session_state.selected_category = available_categories[0]
+        
+        # 필터 2개를 횡으로 배치 (상단에 나란히 배치)
+        filter_col1, filter_col2 = st.columns(2)
+        
+        with filter_col1:
+            # 드롭박스로 카테고리 선택
+            selected_category_label = st.selectbox(
                 "카테고리 선택",
-                ["All"] + available_categories,
-                key="cluster_category_filter"
+                category_options,
+                index=available_categories.index(st.session_state.selected_category) if st.session_state.selected_category in available_categories else 0,
+                key="category_filter"
             )
             
-            # 필터링
-            if selected_category == "All":
-                filtered_df = clusters_df[clusters_df['topic_category'].notna()]
-            else:
-                filtered_df = clusters_df[clusters_df['topic_category'] == selected_category]
+            # 선택된 라벨에 해당하는 카테고리 찾기
+            selected_category = None
+            for cat, label in category_labels.items():
+                if label == selected_category_label:
+                    selected_category = cat
+                    break
             
-            # 클러스터 표시
+            if selected_category is None:
+                selected_category = available_categories[0]
+            
+            st.session_state.selected_category = selected_category
+        
+        with filter_col2:
+            # 클러스터 필터 (선택된 카테고리가 변경되면 클러스터 목록도 업데이트)
+            if selected_category != st.session_state.get('prev_category', None):
+                # 카테고리가 변경되면 첫 번째 클러스터 선택
+                st.session_state.selected_cluster_name = None
+                st.session_state.prev_category = selected_category
+            
+            # 선택된 카테고리의 클러스터 필터링
+            filtered_df = clusters_df[clusters_df['topic_category'] == selected_category]
+            
+            # 클러스터 목록 생성
+            cluster_list = []
             for idx, (_, cluster_row) in enumerate(filtered_df.iterrows()):
-                cluster_id = cluster_row['cluster_id']
-                cluster_id_str = str(cluster_id)
-                cluster_name = cluster_row.get('cluster_name', f"Cluster_{cluster_id}")
-                topic_category = cluster_row.get('topic_category')
+                cluster_name = cluster_row.get('cluster_name')
+                if not cluster_name or pd.isna(cluster_name):
+                    topic_category = cluster_row.get('topic_category')
+                    sub_cluster_index = cluster_row.get('sub_cluster_index')
+                    if pd.notna(sub_cluster_index):
+                        cluster_name = f"{topic_category}_{int(sub_cluster_index) + 1}"
+                    else:
+                        cluster_name = f"Cluster_{cluster_row.get('cluster_id', idx)}"
                 
-                if pd.isna(topic_category) or topic_category is None:
-                    topic_category_display = 'Unknown'
-                else:
-                    topic_category_display = topic_category
+                cluster_list.append({
+                    'name': cluster_name,
+                    'row': cluster_row
+                })
+            
+            if len(cluster_list) == 0:
+                st.selectbox(
+                    "클러스터 선택",
+                    ["클러스터 없음"],
+                    key="cluster_filter",
+                    disabled=True
+                )
+            else:
+                cluster_names = [c['name'] for c in cluster_list]
                 
-                size = cluster_row.get('size', 0)
-                sub_cluster_index = cluster_row.get('sub_cluster_index')
-                top_keywords = cluster_row.get('top_keywords', [])
-                if not isinstance(top_keywords, list):
-                    top_keywords = []
+                # 세션 상태에서 선택된 클러스터 가져오기
+                if 'selected_cluster_name' not in st.session_state or st.session_state.selected_cluster_name not in cluster_names:
+                    st.session_state.selected_cluster_name = cluster_names[0]
                 
-                with st.expander(f"📌 {cluster_name} ({topic_category_display})"):
-                    # 기본 정보
-                    col1, col2, col3, col4 = st.columns(4)
-                    with col1:
-                        st.metric("Cluster ID", cluster_id_str)
-                    with col2:
-                        st.metric("Size", int(size))
-                    with col3:
-                        st.metric("Sub Cluster Index", sub_cluster_index if pd.notna(sub_cluster_index) else "N/A")
-                    with col4:
-                        st.metric("Representative", int(cluster_row.get('representative_count', 0)))
-                    
-                    # 요약 표시 (JSON의 summary 우선, GPT 요약은 선택적)
-                    summary = cluster_row.get('summary', '')
-                    if summary:
-                        st.markdown("**📝 요약:**")
-                        st.info(summary)
-                    
-                    # GPT 요약 (선택적, JSON summary가 없거나 추가 요약이 필요한 경우)
-                    try:
-                        if is_openai_available() and st.checkbox("GPT로 추가 요약 생성", key=f"gpt_summary_{cluster_id_str}"):
-                            with st.spinner("GPT로 클러스터 요약 생성 중..."):
-                                gpt_summary = gpt_service.generate_cluster_summary(
-                                    cluster_id_str,
-                                    top_keywords[:10] if top_keywords else [],
-                                    int(size),
-                                    topic_category_display if topic_category_display != 'Unknown' else 'Unknown'
-                                )
-                                if gpt_summary:
-                                    st.markdown("**🤖 GPT 요약:**")
-                                    st.success(gpt_summary)
-                                else:
-                                    st.info("요약을 생성할 수 없습니다.")
-                    except Exception as gpt_error:
-                        # GPT 실패 시 에러 메시지 표시 (조용히 실패)
-                        pass
-                    
-                    # Top Keywords
-                    if top_keywords:
-                        st.markdown("**🔑 주요 키워드:**")
-                        keywords_str = ", ".join(top_keywords[:20])
-                        st.write(keywords_str)
-                        if len(top_keywords) > 20:
-                            st.caption(f"총 {len(top_keywords)}개 키워드 중 상위 20개 표시")
+                selected_cluster_name = st.selectbox(
+                    "클러스터 선택",
+                    cluster_names,
+                    index=cluster_names.index(st.session_state.selected_cluster_name) if st.session_state.selected_cluster_name in cluster_names else 0,
+                    key="cluster_filter"
+                )
+                
+                st.session_state.selected_cluster_name = selected_cluster_name
+        
+        st.markdown("---")
+        st.markdown(
+            """
+            <style>
+            /* 설명문(caption)과 첫 번째 탭 사이 간격 50% 축소 - 더 강력한 선택자 */
+            [data-testid="stCaption"] {
+                margin-bottom: 0.25rem !important;
+            }
+            
+            /* 첫 번째 탭 그룹의 상단 여백 축소 */
+            [data-testid="stTabs"]:first-of-type {
+                margin-top: 0.25rem !important;
+            }
+            
+            /* 모든 탭 텍스트 크기 통일 */
+            [data-testid="stTabs"] button[role="tab"],
+            [data-testid="stTabs"] button[role="tab"] *,
+            [data-testid="stTabs"] button[role="tab"] div,
+            [data-testid="stTabs"] button[role="tab"] span {
+                font-size: 0.95rem !important;
+                font-weight: 500 !important;
+                color: #9E9E9E !important;
+                padding: 8px 16px !important;
+                background-color: transparent !important;
+            }
+            
+            /* 모든 탭 active 상태 - 기본 Streamlit 스타일 유지 (green 언더바 제거) */
+            [data-testid="stTabs"] button[role="tab"][aria-selected="true"] {
+                color: #ffffff !important;
+                background-color: transparent !important;
+            }
+            
+            /* 비활성 탭은 border 제거 */
+            [data-testid="stTabs"] button[role="tab"]:not([aria-selected="true"]) {
+                border-bottom: none !important;
+            }
+            
+            /* 주제 탭과 클러스터 세부 탭 간격 */
+            [data-testid="stTabs"]:first-of-type {
+                margin-bottom: 3rem !important;
+            }
+            
+            /* 클러스터 탭 (두 번째 레벨) 스타일 - 원래대로 복구 (배경 없이 언더라인만) */
+            /* 상단 탭 스타일의 영향을 받지 않도록 명시적으로 원래 크기 강제 */
+            [data-testid="stTabs"] [data-testid="stTabs"] button[role="tab"],
+            [data-testid="stTabs"] [data-testid="stTabs"] button[role="tab"] *,
+            [data-testid="stTabs"] [data-testid="stTabs"] button[role="tab"] div,
+            [data-testid="stTabs"] [data-testid="stTabs"] button[role="tab"] span,
+            [data-testid="stTabs"] [data-testid="stTabs"] button[role="tab"] p {
+                font-size: 0.95rem !important;
+                font-weight: 500 !important;
+                color: #9E9E9E !important;
+                padding: 8px 16px !important;
+                background-color: transparent !important;
+                border-bottom: none !important; /* 우리가 추가한 border 제거 */
+            }
+            
+            /* 클러스터 탭 active - 배경 없이 기본 red 언더라인만 (Streamlit 기본 스타일 유지) */
+            [data-testid="stTabs"] [data-testid="stTabs"] button[role="tab"][aria-selected="true"] {
+                color: #ffffff !important;
+                background-color: transparent !important;
+                background: transparent !important;
+                font-weight: 600 !important;
+                border-bottom: none !important; /* 우리가 추가한 border 제거 - Streamlit 기본 언더라인만 사용 */
+            }
+            
+            /* 클러스터 탭의 green 언더라인 완전 제거 */
+            [data-testid="stTabs"] [data-testid="stTabs"] button[role="tab"][aria-selected="true"],
+            [data-testid="stTabs"] [data-testid="stTabs"] button[role="tab"][aria-selected="true"] * {
+                background-color: transparent !important;
+                background: transparent !important;
+                border-bottom: none !important; /* 우리가 추가한 border 제거 */
+            }
+            
+            /* 클러스터 탭의 ::after, ::before pseudo-element border 제거 */
+            [data-testid="stTabs"] [data-testid="stTabs"] button[role="tab"][aria-selected="true"]::after,
+            [data-testid="stTabs"] [data-testid="stTabs"] button[role="tab"][aria-selected="true"]::before {
+                border-bottom: none !important;
+                background-color: transparent !important;
+            }
+            
+            /* 클러스터 탭의 tablist 내부 요소 border 제거 */
+            [data-testid="stTabs"] [data-testid="stTabs"] [role="tablist"] button[aria-selected="true"] {
+                border-bottom: none !important; /* 우리가 추가한 border 제거 */
+                background-color: transparent !important;
+            }
+            
+            /* 클러스터 탭 간격 */
+            [data-testid="stTabs"] [data-testid="stTabs"] {
+                margin-top: 0.5rem !important;
+                margin-bottom: 1rem !important;
+            }
+            </style>
+            <script>
+            // 동적으로 스타일 적용 (MutationObserver 사용)
+            (function() {
+                function applyStyles() {
+                    const tabs = document.querySelectorAll('[data-testid="stTabs"]');
+                    if (tabs.length > 0) {
+                        // 모든 탭을 동일한 스타일로 통일
+                        tabs.forEach((tab, tabIndex) => {
+                            const tabList = tab.querySelector('[role="tablist"]');
+                            if (tabList) {
+                                const buttons = tabList.querySelectorAll('button[role="tab"]');
+                                buttons.forEach(btn => {
+                                    // 모든 탭 텍스트 크기 통일
+                                    btn.style.fontSize = '0.95rem';
+                                    btn.style.fontWeight = '500';
+                                    btn.style.padding = '8px 16px';
+                                    btn.style.backgroundColor = 'transparent';
+                                    
+                                    // 버튼 내부의 모든 텍스트 요소에도 동일한 스타일 적용
+                                    const textElements = btn.querySelectorAll('*');
+                                    textElements.forEach(el => {
+                                        el.style.fontSize = '0.95rem';
+                                        el.style.fontWeight = '500';
+                                    });
+                                    
+                                    // 우리가 추가한 green border 제거
+                                    if (btn.style.borderBottom && btn.style.borderBottom.includes('#4CAF50')) {
+                                        btn.style.borderBottom = 'none';
+                                    }
+                                    if (btn.style.borderBottomColor && btn.style.borderBottomColor.includes('#4CAF50')) {
+                                        btn.style.borderBottom = 'none';
+                                    }
+                                    
+                                    if (btn.getAttribute('aria-selected') === 'true') {
+                                        btn.style.color = '#ffffff';
+                                        // Streamlit 기본 언더라인만 사용 (우리가 추가한 border 제거)
+                                        btn.style.borderBottom = 'none';
+                                    } else {
+                                        btn.style.color = '#9E9E9E';
+                                        btn.style.borderBottom = 'none';
+                                    }
+                                });
+                                
+                                // tabList 내부의 모든 요소에서 green border 제거
+                                const allElements = tabList.querySelectorAll('*');
+                                allElements.forEach(el => {
+                                    const style = window.getComputedStyle(el);
+                                    // green 계열의 border 제거
+                                    if (style.borderBottomColor && (
+                                        style.borderBottomColor.includes('4CAF50') ||
+                                        style.borderBottomColor.includes('76, 175, 80')
+                                    )) {
+                                        el.style.borderBottom = 'none';
+                                    }
+                                    // background가 green 계열이면 transparent로
+                                    if (style.backgroundColor && (
+                                        style.backgroundColor.includes('4CAF50') ||
+                                        style.backgroundColor.includes('76, 175, 80')
+                                    )) {
+                                        el.style.backgroundColor = 'transparent';
+                                    }
+                                });
+                            }
+                        });
+                    }
+                }
+                
+                // 즉시 실행
+                applyStyles();
+                
+                // 모든 탭의 green 언더라인 제거 함수
+                function updateUnderlineColor() {
+                    // 모든 탭에서 green 언더라인 제거
+                    const allTabs = document.querySelectorAll('[data-testid="stTabs"]');
+                    allTabs.forEach(tab => {
+                        const tabList = tab.querySelector('[role="tablist"]');
+                        if (tabList) {
+                            const buttons = tabList.querySelectorAll('button[role="tab"]');
+                            buttons.forEach(btn => {
+                                // 우리가 추가한 green border 제거
+                                if (btn.style.borderBottom && btn.style.borderBottom.includes('#4CAF50')) {
+                                    btn.style.borderBottom = 'none';
+                                }
+                                if (btn.style.borderBottomColor && btn.style.borderBottomColor.includes('#4CAF50')) {
+                                    btn.style.borderBottom = 'none';
+                                }
+                                btn.style.backgroundColor = 'transparent';
+                            });
+                            
+                            // tabList 내부의 모든 요소에서 green border 제거
+                            const allElements = tabList.querySelectorAll('*');
+                            allElements.forEach(el => {
+                                const style = window.getComputedStyle(el);
+                                // green 계열의 border 제거
+                                if (style.borderBottomColor && (
+                                    style.borderBottomColor.includes('4CAF50') ||
+                                    style.borderBottomColor.includes('76, 175, 80')
+                                )) {
+                                    el.style.borderBottom = 'none';
+                                }
+                                // background가 green 계열이면 transparent로
+                                if (style.backgroundColor && (
+                                    style.backgroundColor.includes('4CAF50') ||
+                                    style.backgroundColor.includes('76, 175, 80')
+                                )) {
+                                    el.style.backgroundColor = 'transparent';
+                                }
+                            });
+                        }
+                    });
+                }
+                
+                // DOM 변경 감지
+                const observer = new MutationObserver(function(mutations) {
+                    applyStyles();
+                    updateUnderlineColor();
+                });
+                
+                // 문서 로드 후 observer 시작
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', function() {
+                        observer.observe(document.body, {
+                            childList: true,
+                            subtree: true,
+                            attributes: true,
+                            attributeFilter: ['aria-selected']
+                        });
+                        setTimeout(function() {
+                            applyStyles();
+                            updateUnderlineColor();
+                        }, 100);
+                    });
+                } else {
+                    observer.observe(document.body, {
+                        childList: true,
+                        subtree: true,
+                        attributes: true,
+                        attributeFilter: ['aria-selected']
+                    });
+                    setTimeout(function() {
+                        applyStyles();
+                        updateUnderlineColor();
+                    }, 100);
+                }
+                
+                // 추가 안전장치: 여러 번 시도
+                setTimeout(function() {
+                    applyStyles();
+                    updateUnderlineColor();
+                }, 200);
+                setTimeout(function() {
+                    applyStyles();
+                    updateUnderlineColor();
+                }, 500);
+                setTimeout(function() {
+                    applyStyles();
+                    updateUnderlineColor();
+                }, 1000);
+            })();
+            </script>
+            """,
+            unsafe_allow_html=True
+        )
+        
+        # 선택된 클러스터 표시
+        if len(cluster_list) == 0:
+            st.info("이 카테고리에 해당하는 클러스터가 없습니다.")
+            return
+        
+        # 선택된 클러스터 찾기 및 표시
+        selected_cluster = next((c for c in cluster_list if c['name'] == selected_cluster_name), None)
+        
+        if selected_cluster:
+            render_cluster_detail(selected_cluster['row'], gpt_service)
         else:
-            st.info("Not available")
+            st.warning("클러스터를 찾을 수 없습니다.")
             
     except Exception as e:
         st.error(f"Error loading clustering results: {e}")
+        import traceback
+        with st.expander("상세 오류 보기"):
+            st.code(traceback.format_exc())
         st.info("Not available")
-
-
