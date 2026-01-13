@@ -1,0 +1,123 @@
+{
+  "year": 2025,
+  "keywords": ["recipe", "microwave recipe"],
+  "months": [
+    {
+      "month": "2025-01",
+      "series": {
+        "recipe": { "search_index": 88, "reddit_posts": 128 },
+        "microwave recipe": { "search_index": 64, "reddit_posts": 96 }
+      },
+      "turning_points": [
+        { "keyword": "recipe", "reason": "New Year reset: meal planning/healthy cooking interest lifts overall recipe searches." },
+        { "keyword": "microwave recipe", "reason": "Quick-start routines: demand for fast, low-effort meals rises after holidays." }
+      ]
+    },
+    {
+      "month": "2025-02",
+      "series": {
+        "recipe": { "search_index": 80, "reddit_posts": 112 },
+        "microwave recipe": { "search_index": 58, "reddit_posts": 84 }
+      },
+      "turning_points": [
+        { "keyword": "recipe", "reason": "Short-month + event cooking: simple date-night/home dining recipes become more searched." }
+      ]
+    },
+    {
+      "month": "2025-03",
+      "series": {
+        "recipe": { "search_index": 74, "reddit_posts": 106 },
+        "microwave recipe": { "search_index": 55, "reddit_posts": 78 }
+      },
+      "turning_points": []
+    },
+    {
+      "month": "2025-04",
+      "series": {
+        "recipe": { "search_index": 70, "reddit_posts": 98 },
+        "microwave recipe": { "search_index": 52, "reddit_posts": 72 }
+      },
+      "turning_points": []
+    },
+    {
+      "month": "2025-05",
+      "series": {
+        "recipe": { "search_index": 66, "reddit_posts": 92 },
+        "microwave recipe": { "search_index": 48, "reddit_posts": 66 }
+      },
+      "turning_points": [
+        { "keyword": "recipe", "reason": "Seasonal shift: lighter meals & fresh produce recipes increase as weather warms." }
+      ]
+    },
+    {
+      "month": "2025-06",
+      "series": {
+        "recipe": { "search_index": 62, "reddit_posts": 88 },
+        "microwave recipe": { "search_index": 46, "reddit_posts": 62 }
+      },
+      "turning_points": []
+    },
+    {
+      "month": "2025-07",
+      "series": {
+        "recipe": { "search_index": 60, "reddit_posts": 84 },
+        "microwave recipe": { "search_index": 44, "reddit_posts": 58 }
+      },
+      "turning_points": [
+        { "keyword": "recipe", "reason": "Summer routines: no-oven, quick prep, and batch-friendly recipes trend upward." }
+      ]
+    },
+    {
+      "month": "2025-08",
+      "series": {
+        "recipe": { "search_index": 63, "reddit_posts": 90 },
+        "microwave recipe": { "search_index": 50, "reddit_posts": 74 }
+      },
+      "turning_points": [
+        { "keyword": "microwave recipe", "reason": "Back-to-school prep starts: quick dorm/office meals and microwave-friendly ideas rise." }
+      ]
+    },
+    {
+      "month": "2025-09",
+      "series": {
+        "recipe": { "search_index": 72, "reddit_posts": 104 },
+        "microwave recipe": { "search_index": 66, "reddit_posts": 108 }
+      },
+      "turning_points": [
+        { "keyword": "recipe", "reason": "Routine reset: weekday meal planning searches rebound after summer." },
+        { "keyword": "microwave recipe", "reason": "Peak convenience month: school/dorm/commute routines increase microwave cooking demand." }
+      ]
+    },
+    {
+      "month": "2025-10",
+      "series": {
+        "recipe": { "search_index": 78, "reddit_posts": 118 },
+        "microwave recipe": { "search_index": 62, "reddit_posts": 98 }
+      },
+      "turning_points": [
+        { "keyword": "recipe", "reason": "Comfort season begins: soups/roasts/baking queries trend up as temperatures drop." }
+      ]
+    },
+    {
+      "month": "2025-11",
+      "series": {
+        "recipe": { "search_index": 92, "reddit_posts": 146 },
+        "microwave recipe": { "search_index": 60, "reddit_posts": 92 }
+      },
+      "turning_points": [
+        { "keyword": "recipe", "reason": "Holiday cooking ramp: gatherings drive strong recipe search spikes." }
+      ]
+    },
+    {
+      "month": "2025-12",
+      "series": {
+        "recipe": { "search_index": 100, "reddit_posts": 168 },
+        "microwave recipe": { "search_index": 72, "reddit_posts": 120 }
+      },
+      "turning_points": [
+        { "keyword": "recipe", "reason": "Year-end peak: holiday + parties + baking season reaches maximum interest." },
+        { "keyword": "microwave recipe", "reason": "Holiday shortcuts: quick desserts/snacks reheat hacks increase microwave recipe demand." }
+      ]
+    }
+  ]
+}
