@@ -270,73 +270,73 @@ def render_topic_cloud():
             
             # 전체 키워드로 워드 클라우드 생성
             create_wordcloud(all_keywords)
-        
-        # 데이터셋 JSON 다운로드 버튼
-        st.markdown("---")
-        
-        # 다운로드용 데이터 준비
-        # 제외할 키워드 목록
-        excluded_keywords = {'produce'}
-        
-        # 제외할 키워드 필터링 (대소문자 구분 없이)
-        filtered_keywords = [
-            kw for kw in all_keywords 
-            if kw.lower() not in excluded_keywords
-        ]
-        
-        # 키워드 빈도 계산
-        keyword_freq = Counter(filtered_keywords)
-        
-        # lemon 키워드의 빈도를 asparagus와 동일하게 설정
-        asparagus_freq = 0
-        lemon_freq = 0
-        
-        # asparagus 빈도 찾기 (대소문자 구분 없이)
-        for kw, freq in keyword_freq.items():
-            if kw.lower() == 'asparagus':
-                asparagus_freq = freq
-            elif kw.lower() == 'lemon':
-                lemon_freq = freq
-        
-        # asparagus가 있고 lemon이 있으면 lemon의 빈도를 asparagus와 동일하게 설정
-        if asparagus_freq > 0:
-            if lemon_freq > 0:
-                keyword_freq['lemon'] = asparagus_freq
-            else:
-                keyword_freq['lemon'] = asparagus_freq
-        
-        # JSON 데이터 구조 생성
-        download_data = {
-            "metadata": {
-                "total_keywords": len(all_keywords),
-                "unique_keywords": len(set(all_keywords)),
-                "filtered_keywords": len(filtered_keywords),
-                "unique_filtered_keywords": len(keyword_freq),
-                "excluded_keywords": list(excluded_keywords),
-                "asparagus_frequency": asparagus_freq,
-                "lemon_frequency": keyword_freq.get('lemon', 0)
-            },
-            "all_keywords": all_keywords,
-            "filtered_keywords": filtered_keywords,
-            "keyword_frequencies": dict(keyword_freq),
-            "top_keywords": dict(keyword_freq.most_common(50))
-        }
-        
-        # JSON 문자열로 변환
-        json_str = json.dumps(download_data, ensure_ascii=False, indent=2)
-        
-        # 다운로드 버튼
-        st.download_button(
-            "📥 데이터셋 다운로드 (JSON)",
-            json_str,
-            "topic_cloud_dataset.json",
-            "application/json",
-            key="download_topic_cloud_json"
-        )
             
-    except Exception as e:
-        st.error(f"Error loading topic cloud data: {e}")
-        import traceback
-        with st.expander("상세 오류 보기"):
-            st.code(traceback.format_exc())
-        st.info("Not available")
+            # 데이터셋 JSON 다운로드 버튼
+            st.markdown("---")
+            
+            # 다운로드용 데이터 준비
+            # 제외할 키워드 목록
+            excluded_keywords = {'produce'}
+            
+            # 제외할 키워드 필터링 (대소문자 구분 없이)
+            filtered_keywords = [
+                kw for kw in all_keywords 
+                if kw.lower() not in excluded_keywords
+            ]
+            
+            # 키워드 빈도 계산
+            keyword_freq = Counter(filtered_keywords)
+            
+            # lemon 키워드의 빈도를 asparagus와 동일하게 설정
+            asparagus_freq = 0
+            lemon_freq = 0
+            
+            # asparagus 빈도 찾기 (대소문자 구분 없이)
+            for kw, freq in keyword_freq.items():
+                if kw.lower() == 'asparagus':
+                    asparagus_freq = freq
+                elif kw.lower() == 'lemon':
+                    lemon_freq = freq
+            
+            # asparagus가 있고 lemon이 있으면 lemon의 빈도를 asparagus와 동일하게 설정
+            if asparagus_freq > 0:
+                if lemon_freq > 0:
+                    keyword_freq['lemon'] = asparagus_freq
+                else:
+                    keyword_freq['lemon'] = asparagus_freq
+            
+            # JSON 데이터 구조 생성
+            download_data = {
+                "metadata": {
+                    "total_keywords": len(all_keywords),
+                    "unique_keywords": len(set(all_keywords)),
+                    "filtered_keywords": len(filtered_keywords),
+                    "unique_filtered_keywords": len(keyword_freq),
+                    "excluded_keywords": list(excluded_keywords),
+                    "asparagus_frequency": asparagus_freq,
+                    "lemon_frequency": keyword_freq.get('lemon', 0)
+                },
+                "all_keywords": all_keywords,
+                "filtered_keywords": filtered_keywords,
+                "keyword_frequencies": dict(keyword_freq),
+                "top_keywords": dict(keyword_freq.most_common(50))
+            }
+            
+            # JSON 문자열로 변환
+            json_str = json.dumps(download_data, ensure_ascii=False, indent=2)
+            
+            # 다운로드 버튼
+            st.download_button(
+                "📥 데이터셋 다운로드 (JSON)",
+                json_str,
+                "topic_cloud_dataset.json",
+                "application/json",
+                key="download_topic_cloud_json"
+            )
+            
+        except Exception as e:
+            st.error(f"Error loading topic cloud data: {e}")
+            import traceback
+            with st.expander("상세 오류 보기"):
+                st.code(traceback.format_exc())
+            st.info("Not available")
