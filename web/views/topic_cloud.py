@@ -56,6 +56,26 @@ def create_wordcloud(keywords_list: List[str], title: str = "Topic Cloud") -> No
         # 키워드 빈도 계산
         keyword_freq = Counter(filtered_keywords)
         
+        # lemon 키워드의 빈도를 asparagus와 동일하게 설정
+        asparagus_freq = 0
+        lemon_freq = 0
+        
+        # asparagus 빈도 찾기 (대소문자 구분 없이)
+        for kw, freq in keyword_freq.items():
+            if kw.lower() == 'asparagus':
+                asparagus_freq = freq
+            elif kw.lower() == 'lemon':
+                lemon_freq = freq
+        
+        # asparagus가 있고 lemon이 있으면 lemon의 빈도를 asparagus와 동일하게 설정
+        if asparagus_freq > 0:
+            if lemon_freq > 0:
+                # lemon이 이미 있으면 빈도만 조정
+                keyword_freq['lemon'] = asparagus_freq
+            else:
+                # lemon이 없으면 추가
+                keyword_freq['lemon'] = asparagus_freq
+        
         # 워드 클라우드 생성
         wordcloud = WordCloud(
             width=1200,
