@@ -62,7 +62,7 @@ def create_wordcloud(keywords_list: List[str], title: str = "Topic Cloud") -> No
         fig, ax = plt.subplots(figsize=(14, 7))
         ax.imshow(wordcloud, interpolation='bilinear')
         ax.axis('off')
-        ax.set_title(title, fontsize=18, color='#ffffff', pad=20, fontweight='bold')
+        # 제목 제거
         
         # 다크 모드 스타일 적용
         fig.patch.set_facecolor('#1e1e28')
@@ -169,11 +169,8 @@ def render_topic_cloud():
             st.info("키워드 데이터가 없습니다.")
             return
         
-        st.markdown("### 전체 키워드 워드 클라우드")
-        st.caption("모든 주제의 키워드를 통합하여 시각화합니다.")
-        
         # 전체 키워드로 워드 클라우드 생성
-        create_wordcloud(all_keywords, "Reddit Topic Cloud - All Keywords")
+        create_wordcloud(all_keywords)
         
         st.markdown("---")
         
