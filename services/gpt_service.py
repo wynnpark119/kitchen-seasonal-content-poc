@@ -239,136 +239,175 @@ Topic Category: {topic_category}
         why_now_kr: str,
         why_now_en: str,
         content_angle: str,
-        related_topics: List[str]
-    ) -> Tuple[Optional[str], Optional[str]]:
+        related_topics: List[str],
+        prompt_version: str = "planning_v2"
+    ) -> Tuple[Optional[str], Optional[str], Optional[Dict[str, str]]]:
         """
-        LG전자 HS 콘텐츠 인사이트 생성
+        AI 콘텐츠 플래닝 생성
+        
+        콘텐츠 기획자가 바로 실행 방향을 잡을 수 있도록
+        '블로그는 어떻게 쓰고, 소셜은 어떻게 쓰는지'를 명확하게 제시하는 콘텐츠 플래닝을 생성합니다.
         
         Args:
             topic_category: 토픽 카테고리
             master_topic_kr: 마스터 토픽 (한국어)
             master_topic_en: 마스터 토픽 (영어)
-            why_now_kr: Why Now (한국어)
-            why_now_en: Why Now (영어)
+            why_now_kr: Why Now (한국어) - 사용하지 않음
+            why_now_en: Why Now (영어) - 사용하지 않음
             content_angle: 콘텐츠 앵글
             related_topics: 연관 주제 리스트
+            prompt_version: 프롬프트 버전 (캐시 무효화용)
             
         Returns:
-            Tuple[Optional[str], Optional[str]]: (인사이트 텍스트, 에러 메시지)
-            - 성공 시: (인사이트 텍스트, None)
-            - 실패 시: (None, 에러 메시지)
+            Tuple[Optional[str], Optional[str], Optional[Dict]]: (콘텐츠 플래닝 텍스트, 에러 메시지, 디버그 정보)
+            - 성공 시: (콘텐츠 플래닝 텍스트, None, 디버그 정보)
+            - 실패 시: (None, 에러 메시지, 디버그 정보)
         """
         if not is_openai_available():
             error_msg = "OpenAI API 키가 설정되지 않았습니다."
             logger.error(error_msg)
-            return None, error_msg
+            return None, error_msg, None
+        
+        # 디버그 정보 초기화
+        debug_info = {
+            "function_name": "generate_hs_insight",
+            "prompt_version": prompt_version,
+            "model": None,
+            "temperature": 0.2,
+            "user_prompt": None,
+            "response_preview": None
+        }
         
         # 연관 주제 포맷팅 (빈 값 처리)
         if related_topics and len(related_topics) > 0:
             related_topics_text = ", ".join([str(t) for t in related_topics[:3] if t])
         else:
-            related_topics_text = "None"
+            related_topics_text = "없음"
         
-        # 빈 값 안전 처리
+        # 빈 값 안전 처리 (why_now는 사용하지 않음)
         topic_category = topic_category or "N/A"
         master_topic_kr = master_topic_kr or "N/A"
         master_topic_en = master_topic_en or ""
-        why_now_kr = why_now_kr or ""
-        why_now_en = why_now_en or ""
         content_angle = content_angle or ""
         
-        # 시스템 프롬프트
-        system_prompt = """너는 LG전자 HS(생활가전) 관점의 전략적 콘텐츠 인사이트 분석가다.
-마스터 토픽 정보를 바탕으로, 단순 콘텐츠 아이디어가 아닌
-"왜 이 마스터 토픽이 전략적으로 의미 있는가"를 설명하는 인사이트를 작성해라.
+        # 시스템 프롬프트 (완전히 새로 작성)
+        system_prompt = """당신은 글로벌 가전 브랜드(주방가전)에서 블로그·소셜·캠페인 콘텐츠를 실제로 설계하는 시니어 콘텐츠 플래너입니다.
+전략 설명이 아니라 실행 가능한 콘텐츠 기획안을 제시해야 합니다.
 
-절대 금지 사항 (위반 시 실패):
-- "봄 = 가벼운 식사", "제철 재료 활용" 같은 피상적 계절 설명 금지
-- 레시피 나열, 요리법 제안, "아스파라거스와 레몬" 같은 재료 언급 금지
-- "Blog: 레시피 소개", "Social: 메뉴 소개" 같은 콘텐츠 포맷 제안 금지
-- "조회수", "참여율", "활용률", "KPI", "지표" 같은 성과 측정 관련 단어 전부 금지
-- "소비자들은 ~를 원한다" 같은 일반적인 마케팅 문구 금지
-- 제품/브랜드 직접 언급 금지
+🚫 절대 사용 금지 (위반 시 즉시 실패):
+- "📌 LG HS Strategic Content Insight" 타이틀 절대 사용 금지
+- "A.", "B.", "C.", "D.", "E." 같은 알파벳 섹션 절대 사용 금지
+- "Customer Transition Signal", "HS Context" 같은 이전 섹션명 절대 사용 금지
+- 추상적 인사이트, 이론 설명 금지 ("왜 중요하다", "전환 시점이다" 같은 문장 최소화)
+- 이미 화면에 표시된 '선정 이유(Why)'를 재설명하지 않음
+- "조회수", "참여율", "KPI", "지표" 같은 성과 측정 관련 단어 전부 금지
+- "인사이트", "전환", "니즈" 같은 마케팅 용어 남용 금지
+- Reddit, Google, 검색 데이터 언급 금지
 
-필수 원칙:
-- '설명'보다 '해석'에 가까운 문장 사용
-- 각 섹션당 최소 2~3단락 이상 서술
-- 전략적 깊이와 맥락 설명 강화
-- 고객의 심리적·행동적 갈등 구조 중심으로 서술"""
+✅ 반드시 사용해야 하는 형식 (정확히 이 형식만 사용):
+- 타이틀: "### 콘텐츠 활용 인사이트" (반드시 이 정확한 텍스트 사용)
+- 섹션 1: "#### 1. 글로벌 블로그 콘텐츠 기획 방향 (How-to 중심)"
+- 섹션 2: "#### 2. 소셜 콘텐츠 기획 방향 (Instagram 중심)"
+- 섹션 3: "#### 3. 시리즈 / 캠페인 확장 아이디어"
+- 섹션 4: "#### 4. LG전자 HS 관점에서의 콘텐츠 역할"
+
+✅ 필수 원칙:
+- 콘텐츠 기획자 관점에서의 설계 언어 사용
+- 콘텐츠 구조, 컷 구성, 메시지 밀도, 독자 행동 기준 명확히 제시
+- "읽고 나면 / 보고 나면 무엇을 하게 되는가"가 항상 드러나야 함
+- 문장은 기획안 문서에 바로 복사 가능한 수준으로 작성
+- 한국어 출력 (공식/기획자용 톤)
+- 모든 채널에 공통 적용 가능한 프레임 (특정 제품/기능 설명 ❌, 주방 사용 맥락과 루틴 중심)"""
         
-        # 유저 프롬프트
-        user_prompt = f"""입력:
-[Topic Category] {topic_category}
-[Title KR] {master_topic_kr}
-[Title EN] {master_topic_en}
-[Why Now KR] {why_now_kr}
-[Why Now EN] {why_now_en}
-[Content Angle] {content_angle}
-[Related Topics] {related_topics_text}
+        # 유저 프롬프트 (완전히 새로 작성)
+        user_prompt = f"""⚠️ 매우 중요: 반드시 아래 형식만 사용하라. 다른 형식 사용 절대 금지.
 
-출력 포맷(Markdown) - 반드시 이 형식과 내용 기준을 정확히 따를 것:
+[입력 데이터]
+- 선택된 마스터 토픽: {master_topic_kr}
+- 토픽 카테고리: {topic_category}
+- 콘텐츠 앵글: {content_angle}
+- 연관 주제: {related_topics_text}
 
-### 📌 LG HS Strategic Content Insight
+⚠️ 주의: 이미 도출된 선정 이유(Why this topic exists)는 재설명하지 말 것.
 
-**A. Customer Transition Signal**
+📤 출력 포맷 (반드시 이 구조 유지):
 
-[절대 금지: "봄이 다가오면서", "제철 재료", "가벼운 식사", "건강한 식습관" 같은 피상적 표현]
+### 콘텐츠 활용 인사이트
 
-고객이 겪는 심리적·행동적 갈등 구조를 중심으로 서술하라.
-- 무엇을 포기하고 싶지 않은지 (예: 기존 식사 패턴의 만족감, 편의성)
-- 무엇이 불편해졌는지 (예: 선택의 어려움, 시간 부족, 결정 피로)
-- 왜 선택을 망설이게 되는지 (예: 변화에 대한 불안, 기준 부재)
-- '적게 먹기'가 아니라 '다르게 먹기'를 고민하는 전환기로 명확히 정의
-- 왜 지금 이 전환이 중요한지(Why now)를 고객의 실제 생활/주방 맥락에서 설명
-- 최소 2~3단락으로 깊이 있게 서술
+#### 1. 글로벌 블로그 콘텐츠 기획 방향 (How-to 중심)
 
-**B. HS Context / Home Workflow**
+• 콘텐츠 목적
+독자가 글을 끝까지 읽었을 때 오늘 저녁 바로 실행할 수 있어야 함
 
-[절대 금지: "레시피", "재료", "조리 시간", "요리법" 같은 구체적 조리 관련 언급]
+• 권장 콘텐츠 구조
+- Why: 이 주제의 요리가 평일에 특히 유효한 이유 (1~2문장)
+- What: 이 방식이 기존 요리보다 나은 핵심 포인트 3가지
+- How: 실제 조리 흐름을 기준으로 한 단계 구성 (재료 → 조리 → 마무리 → 보관까지 이어지는 구조)
+- Practical Tips: 실패하기 쉬운 포인트, 남은 재료/다음 끼니로 연결되는 팁
+- 편집 가이드: 이미지/도식이 필요한 지점 명시, 스크롤 중단 없이 읽히는 문단 길이 기준 제안
 
-주방을 '공간'이 아니라 '행동 흐름'으로 설명하라.
-- 조리 → 식사 → 정리까지의 변화된 리듬을 묘사 (시간대별, 요일별 패턴)
-- 봄 시즌 저녁 시간대의 특성 반영 (일과 후 피로도, 가족 구성원의 변화된 일정 등)
-- LG HS 관점에서 주방이 어떤 기능적 역할을 하게 되는지 명확히 기술
-- 주방 사용 맥락을 정돈해 주는 역할 관점에서 서술
-- 최소 2~3단락으로 서술
+[위 구조에 맞춰 이 마스터 토픽("{master_topic_kr}")에 대한 구체적인 블로그 콘텐츠 기획안을 작성하라. 기획안 문서에 바로 복사 가능한 수준으로 작성하라.]
 
-**C. Content Activation Direction**
+#### 2. 소셜 콘텐츠 기획 방향 (Instagram 중심)
 
-[절대 금지: "레시피 소개", "메뉴 소개", "조리법 공유", "요리 콘텐츠" 같은 구체적 콘텐츠 포맷]
+• 핵심 목표
+설명을 읽지 않아도 한 번에 이해되는 콘텐츠
 
-'콘텐츠 포맷'이 아니라 '콘텐츠 역할'을 설명하라.
-- 각 채널별로 무엇을 보여줄지가 아니라, 고객의 어떤 고민을 대신 정리해 주는지 중심으로 작성
-- 결과물이 아니라 '선택 기준'과 '처리 방식'을 제안하는 방향으로 작성
-- Blog: 고객의 어떤 고민(예: 선택 기준 부재, 정보 과부하)을 대신 정리해 주는지 (2~3줄)
-- Social: 고객의 어떤 고민(예: 결정 피로, 비교 어려움)을 대신 정리해 주는지 (2~3줄)
-- Campaign: 고객의 어떤 고민(예: 변화에 대한 불안, 실행 방법 모호)을 대신 정리해 주는지 (2~3줄)
-- 콘텐츠를 '레시피'가 아닌 '생활 방식' 관점으로 확장하는 방향 제시
+• 추천 메시지 유형
+- 바로 써먹을 수 있는 문장형 훅 제안 (3~5개)
+- 판단을 대신 내려주는 단정형 문구 사용
 
-**D. Brand Role**
+• 비주얼 구성 가이드
+- 한 컷 완결 / Before–After / 조리 중간 컷 중 무엇이 적합한지 명시
+- 촬영 각도·구도에 대한 구체적 제안
 
-[절대 금지: "조언자", "제공자", "설명자", "도움을 주는" 같은 역할 표현]
+• 운영 관점 팁
+- 반복 노출해도 피로하지 않은 포맷
+- 시리즈화 시 유지해야 할 포맷 규칙
 
-LG전자를 '주방 사용 맥락을 정돈해 주는 역할'로 정의하라.
-- 다음 문맥 중 최소 1개 이상 포함: 선택 피로 감소, 생활 리듬 안정, 저녁 루틴 정리
-- LG HS가 점유할 수 있는 역할을 명확히 기술 (예: 복잡한 선택을 단순화, 일상의 리듬을 안정화)
-- 최소 2~3단락으로 서술
+[위 구조에 맞춰 이 마스터 토픽("{master_topic_kr}")에 대한 구체적인 소셜 콘텐츠 기획안을 작성하라. 기획안 문서에 바로 복사 가능한 수준으로 작성하라.]
 
-**E. Risks & Guardrails**
+#### 3. 시리즈 / 캠페인 확장 아이디어
 
-[절대 금지: "조회수", "참여율", "활용률", "KPI", "지표", "측정" 같은 성과 관련 단어]
+• 캠페인의 성격 정의
+'도전'이 아닌 '루틴 제안'으로 보이게 설계
 
-운영 리스크가 아니라 '해석 리스크' 중심으로 작성하라.
-- 다이어트/건강 과잉 해석 방지 (예: "건강한 식사"가 다이어트로 오해될 위험)
-- 감성 메시지 소비로 흐를 위험 명시 (예: 실제 행동 변화 없이 감정만 소비되는 경우)
-- 실제 주방 행동 변화와의 연결 중요성 강조 (예: 콘텐츠가 실제 주방 사용 패턴 변화로 이어져야 함)
-- 최소 2~3단락으로 서술
+• 시리즈 구성 예시
+- 기간 (예: 5일 / 1주 / 평일 기준)
+- 하루 단위 콘텐츠의 역할 분담
 
-[최종 검증]
-- D 섹션에 "Measurement Ideas"가 아닌 "Brand Role"이 있는지 확인
-- 레시피, 재료명, 조리법이 언급되지 않았는지 확인
-- 성과 지표, KPI 관련 단어가 전혀 없는지 확인
-- 각 섹션이 2~3단락 이상인지 확인"""
+• 확장 가능성
+다른 주제(정리, 보관, 스타일링)와 연결될 수 있는 지점 제시
+
+[위 구조에 맞춰 이 마스터 토픽("{master_topic_kr}")에 대한 구체적인 시리즈/캠페인 확장 아이디어를 작성하라. 기획안 문서에 바로 복사 가능한 수준으로 작성하라.]
+
+#### 4. LG전자 HS 관점에서의 콘텐츠 역할
+
+• 브랜드 노출 방식
+제품 설명 없이도 '이 브랜드는 주방 사용 흐름을 이해하고 있다'는 인식이 생기도록 설계
+
+• 브랜드가 담당해야 할 역할
+- 고객의 선택 피로를 줄이는 기준 제시자
+- 복잡한 주방 행동을 정리해 주는 가이드
+
+• 주의할 점
+과도한 기능 강조, 다이어트·효율 강박으로 오해될 수 있는 메시지 회피
+
+[위 구조에 맞춰 이 마스터 토픽("{master_topic_kr}")에서 LG전자 HS가 가져야 할 구체적인 콘텐츠 역할을 작성하라. 기획안 문서에 바로 복사 가능한 수준으로 작성하라.]
+
+[최종 검증 - 반드시 확인 후 출력]
+1. 타이틀이 정확히 "### 콘텐츠 활용 인사이트"인지 확인
+2. 섹션이 정확히 "#### 1. 글로벌 블로그 콘텐츠 기획 방향 (How-to 중심)", "#### 2. 소셜 콘텐츠 기획 방향 (Instagram 중심)", "#### 3. 시리즈 / 캠페인 확장 아이디어", "#### 4. LG전자 HS 관점에서의 콘텐츠 역할"인지 확인
+3. "A.", "B.", "C.", "D.", "E." 같은 알파벳 섹션이 전혀 없는지 확인
+4. 추상적 인사이트, 이론 설명이 없는지 확인 ("왜 중요하다", "전환 시점이다" 같은 문장 최소화)
+5. 선정 이유(Why)를 재설명하지 않았는지 확인
+6. "인사이트", "전환", "니즈" 같은 마케팅 용어를 남용하지 않았는지 확인
+7. 문장이 기획안 문서에 바로 복사 가능한 수준인지 확인
+8. "읽고 나면 / 보고 나면 무엇을 하게 되는가"가 드러나는지 확인
+9. 특정 제품/기능 설명이 아닌 주방 사용 맥락과 루틴 중심인지 확인
+10. 콘텐츠 구조, 컷 구성, 메시지 밀도가 명확히 제시되었는지 확인
+
+위 모든 항목을 확인한 후에만 출력하라. 하나라도 위반되면 다시 작성하라."""
         
         try:
             # 클라이언트 가져오기 (예외 처리 포함)
@@ -380,18 +419,23 @@ LG전자를 '주방 사용 맥락을 정돈해 주는 역할'로 정의하라.
                 logger.exception("OpenAI client initialization error")
                 if "OPENAI_API_KEY" in error_msg:
                     error_msg = "API 키를 찾을 수 없습니다. 환경변수 또는 .env 파일을 확인하세요."
-                return None, error_msg
+                return None, error_msg, debug_info
             except Exception as e:
                 logger.exception("Unexpected error getting OpenAI client")
-                return None, f"클라이언트 초기화 오류: {type(e).__name__}: {str(e)}"
+                error_msg = f"클라이언트 초기화 오류: {type(e).__name__}: {str(e)}"
+                return None, error_msg, debug_info
             
             # 모델명 가져오기
             model_name = self._get_model_name()
-            logger.debug(f"Calling GPT API with model: {model_name}")
+            debug_info["model"] = model_name
+            logger.debug(f"Calling GPT API with model: {model_name}, prompt_version: {prompt_version}")
             logger.debug(f"Topic: {master_topic_kr[:50]}...")
             
-            # 재시도 로직 (최대 2회, 짧은 백오프)
-            max_retries = 2
+            # 디버그 정보에 프롬프트 저장
+            debug_info["user_prompt"] = user_prompt[:500] + "..." if len(user_prompt) > 500 else user_prompt
+            
+            # 재시도 로직 (최대 3회, 짧은 백오프)
+            max_retries = 3
             timeout_seconds = int(os.getenv("OPENAI_TIMEOUT", "60"))
             
             for attempt in range(max_retries + 1):
@@ -402,18 +446,63 @@ LG전자를 '주방 사용 맥락을 정돈해 주는 역할'로 정의하라.
                             {"role": "system", "content": system_prompt},
                             {"role": "user", "content": user_prompt}
                         ],
-                        temperature=0.7,
-                        max_tokens=2000,
+                        temperature=0.2,  # 더 낮춰서 일관된 형식 유지
+                        max_tokens=2500,  # 충분한 길이 보장
                         timeout=timeout_seconds
                     )
                     result = response.choices[0].message.content.strip()
                     logger.info(f"GPT API call successful. Response length: {len(result)}")
-                    return result, None
+                    
+                    # 디버그 정보에 응답 저장
+                    debug_info["response_preview"] = result[:500] + "..." if len(result) > 500 else result
+                    
+                    # 응답 검증: 이전 형식이 포함되어 있으면 에러
+                    forbidden_patterns = [
+                        "LG HS Strategic Content Insight",
+                        "A. Customer Transition Signal",
+                        "B. HS Context",
+                        "C. Content Activation Direction",
+                        "D. Brand Role",
+                        "E. Risks & Guardrails",
+                        "Customer Transition Signal",
+                        "HS Context / Home Workflow"
+                    ]
+                    
+                    for pattern in forbidden_patterns:
+                        if pattern in result:
+                            logger.error(f"Forbidden pattern '{pattern}' found in response. Attempt {attempt + 1}/{max_retries + 1}")
+                            # 재시도
+                            if attempt < max_retries:
+                                wait_time = (attempt + 1) * 2
+                                logger.warning(f"Retrying after {wait_time}s due to forbidden pattern")
+                                time.sleep(wait_time)
+                                break
+                            else:
+                                error_msg = f"응답에 금지된 형식이 포함되어 있습니다: {pattern}. 프롬프트 버전: {prompt_version}"
+                                debug_info["error"] = error_msg
+                                return None, error_msg, debug_info
+                    else:
+                        # for 루프가 break 없이 완료되면 (금지 패턴 없음)
+                        # 올바른 형식 확인
+                        if "### 콘텐츠 활용 인사이트" not in result:
+                            logger.warning(f"올바른 타이틀이 없습니다. Attempt {attempt + 1}/{max_retries + 1}")
+                            if attempt < max_retries:
+                                wait_time = (attempt + 1) * 2
+                                time.sleep(wait_time)
+                                continue
+                            else:
+                                error_msg = f"올바른 타이틀이 없습니다. 프롬프트 버전: {prompt_version}"
+                                debug_info["error"] = error_msg
+                                return None, error_msg, debug_info
+                        
+                        # 모든 검증 통과
+                        return result, None, debug_info
                     
                 except AuthenticationError as e:
                     error_msg = f"인증 오류 (401): API 키가 유효하지 않습니다."
                     logger.exception("Authentication error")
-                    return None, error_msg
+                    debug_info["error"] = error_msg
+                    return None, error_msg, debug_info
                     
                 except RateLimitError as e:
                     if attempt < max_retries:
@@ -424,7 +513,8 @@ LG전자를 '주방 사용 맥락을 정돈해 주는 역할'로 정의하라.
                     else:
                         error_msg = "API 사용량 제한에 도달했습니다. 잠시 후 다시 시도해주세요."
                         logger.exception("Rate limit error (max retries exceeded)")
-                        return None, error_msg
+                        debug_info["error"] = error_msg
+                        return None, error_msg, debug_info
                         
                 except APITimeoutError as e:
                     if attempt < max_retries:
@@ -435,7 +525,8 @@ LG전자를 '주방 사용 맥락을 정돈해 주는 역할'로 정의하라.
                     else:
                         error_msg = f"요청 시간 초과 ({timeout_seconds}초). 네트워크 연결을 확인하고 다시 시도해주세요."
                         logger.exception("Timeout error (max retries exceeded)")
-                        return None, error_msg
+                        debug_info["error"] = error_msg
+                        return None, error_msg, debug_info
                         
                 except APIConnectionError as e:
                     if attempt < max_retries:
@@ -446,7 +537,8 @@ LG전자를 '주방 사용 맥락을 정돈해 주는 역할'로 정의하라.
                     else:
                         error_msg = "네트워크 연결 오류가 발생했습니다. 인터넷 연결을 확인해주세요."
                         logger.exception("Connection error (max retries exceeded)")
-                        return None, error_msg
+                        debug_info["error"] = error_msg
+                        return None, error_msg, debug_info
                         
                 except APIError as e:
                     error_type = type(e).__name__
@@ -462,18 +554,79 @@ LG전자를 '주방 사용 맥락을 정돈해 주는 역할'로 정의하라.
                         error_msg = f"API 오류 ({status_code or error_type}): {str(e)}"
                     
                     logger.exception(f"API error ({error_type}, status={status_code})")
-                    return None, error_msg
+                    debug_info["error"] = error_msg
+                    return None, error_msg, debug_info
                     
             # 모든 재시도 실패
             error_msg = "모든 재시도가 실패했습니다."
             logger.error(error_msg)
-            return None, error_msg
+            debug_info["error"] = error_msg
+            return None, error_msg, debug_info
             
         except Exception as e:
             error_type = type(e).__name__
             error_msg = f"예상치 못한 오류 ({error_type}): {str(e)}"
             logger.exception("Unexpected error in generate_hs_insight")
-            return None, error_msg
+            debug_info["error"] = error_msg
+            return None, error_msg, debug_info
+    
+    def classify_query_content_type(
+        self,
+        query: str,
+        aio_text: Optional[str] = None
+    ) -> Optional[str]:
+        """
+        쿼리를 evergreen/seasonal/other로 분류
+        
+        Args:
+            query: 검색 쿼리
+            aio_text: AI Overview 텍스트 (선택적)
+            
+        Returns:
+            'evergreen', 'seasonal', 'other' 중 하나 또는 None (실패 시)
+        """
+        if not is_openai_available():
+            return None
+        
+        # 프롬프트 구성
+        context = f"Query: {query}"
+        if aio_text:
+            context += f"\n\nAI Overview: {aio_text[:500]}"
+        
+        prompt = f"""다음 검색 쿼리를 분석하여 콘텐츠 타입을 분류해주세요.
+
+{context}
+
+분류 기준:
+- **evergreen**: 계절과 무관하게 지속적으로 검색되는 주제 (예: 냉장고 정리, 채소 보관법, 요리 기본기)
+- **seasonal**: 특정 계절(특히 봄)에 집중적으로 검색되는 주제 (예: 봄 레시피, 봄 주방 인테리어, 봄 식재료)
+- **other**: 위 두 가지에 명확히 속하지 않는 주제
+
+반드시 다음 중 하나만 반환하세요: evergreen, seasonal, other
+추가 설명 없이 단어만 반환하세요."""
+
+        try:
+            response = self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "You are a content classification assistant. Return only one word: evergreen, seasonal, or other."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.3,
+                max_tokens=10
+            )
+            result = response.choices[0].message.content.strip().lower()
+            
+            # 결과 검증
+            if result in ['evergreen', 'seasonal', 'other']:
+                return result
+            else:
+                logger.warning(f"Unexpected classification result: {result}, defaulting to 'other'")
+                return 'other'
+                
+        except Exception as e:
+            logger.error(f"Error classifying query content type: {e}")
+            return None
 
 
 # 싱글톤 인스턴스
@@ -484,37 +637,44 @@ def get_gpt_service() -> GPTService:
     """GPT 서비스 싱글톤 인스턴스 반환"""
     global _gpt_service
     
+    # 필수 메서드 목록
+    required_methods = ['generate_hs_insight', 'classify_query_content_type']
+    
     # 클래스 레벨에서 메서드 존재 확인
-    if not hasattr(GPTService, 'generate_hs_insight'):
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.error("GPTService class missing generate_hs_insight method! This indicates a code loading issue.")
-        raise AttributeError(
-            "GPTService class does not have generate_hs_insight method. "
-            "This usually means Streamlit is using a cached version of the module. "
-            "Please restart Streamlit completely (stop and restart)."
-        )
+    for method_name in required_methods:
+        if not hasattr(GPTService, method_name):
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"GPTService class missing {method_name} method! This indicates a code loading issue.")
+            raise AttributeError(
+                f"GPTService class does not have {method_name} method. "
+                "This usually means Streamlit is using a cached version of the module. "
+                "Please restart Streamlit completely (stop and restart)."
+            )
     
     # 인스턴스 레벨에서 메서드 존재 확인 및 강제 리셋
     if _gpt_service is not None:
-        if not hasattr(_gpt_service, 'generate_hs_insight'):
-            # 이전 버전의 인스턴스가 캐시되어 있음 - 강제 리셋
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.warning("GPT service instance missing generate_hs_insight method, resetting instance...")
-            _gpt_service = None
+        for method_name in required_methods:
+            if not hasattr(_gpt_service, method_name):
+                # 이전 버전의 인스턴스가 캐시되어 있음 - 강제 리셋
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"GPT service instance missing {method_name} method, resetting instance...")
+                _gpt_service = None
+                break
     
     if _gpt_service is None:
         _gpt_service = GPTService()
         # 생성 후 메서드 존재 확인
-        if not hasattr(_gpt_service, 'generate_hs_insight'):
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error("New GPT service instance also missing generate_hs_insight method!")
-            raise AttributeError(
-                "GPTService instance does not have generate_hs_insight method. "
-                "Please restart Streamlit completely (Ctrl+C to stop, then restart)."
-            )
+        for method_name in required_methods:
+            if not hasattr(_gpt_service, method_name):
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"New GPT service instance also missing {method_name} method!")
+                raise AttributeError(
+                    f"GPTService instance does not have {method_name} method. "
+                    "Please restart Streamlit completely (Ctrl+C to stop, then restart)."
+                )
     
     return _gpt_service
 
