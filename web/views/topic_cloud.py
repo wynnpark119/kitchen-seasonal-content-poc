@@ -76,7 +76,7 @@ def create_wordcloud(keywords_list: List[str], title: str = "Topic Cloud") -> No
                 # lemon이 없으면 추가
                 keyword_freq['lemon'] = asparagus_freq
         
-        # 워드 클라우드 생성
+        # 워드 클라우드 생성 (random_state 고정으로 매번 동일한 배치)
         wordcloud = WordCloud(
             width=1200,
             height=600,
@@ -88,7 +88,8 @@ def create_wordcloud(keywords_list: List[str], title: str = "Topic Cloud") -> No
             font_path=None,  # 시스템 기본 폰트 사용
             prefer_horizontal=0.7,
             min_font_size=10,
-            max_font_size=120
+            max_font_size=120,
+            random_state=42  # 고정된 랜덤 시드로 매번 동일한 배치
         ).generate_from_frequencies(keyword_freq)
         
         # matplotlib로 이미지 생성
