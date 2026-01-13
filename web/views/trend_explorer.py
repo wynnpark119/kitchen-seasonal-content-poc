@@ -8,6 +8,39 @@ import pandas as pd
 
 from services.serp_service import get_serp_service
 from web.db_queries import parse_cited_sources
+from web.components import render_insight_card, render_card
+
+
+def classify_query_category(query: str) -> str:
+    """
+    쿼리를 4개 카테고리로 분류
+    
+    Returns:
+        'SPRING_RECIPES', 'SPRING_KITCHEN_STYLING', 'REFRIGERATOR_ORGANIZATION', 'VEGETABLE_PREP_HANDLING', 'OTHER'
+    """
+    query_lower = query.lower()
+    
+    # SPRING_RECIPES: recipe, meal, dinner, cook, food 관련
+    if any(term in query_lower for term in ['recipe', 'meal', 'dinner', 'cook', 'food', 'dish', 'cuisine']):
+        if any(term in query_lower for term in ['spring', 'seasonal', 'light', 'healthy']):
+            return 'SPRING_RECIPES'
+    
+    # SPRING_KITCHEN_STYLING: decor, styling, design, refresh, atmosphere 관련
+    if any(term in query_lower for term in ['decor', 'styling', 'style', 'design', 'refresh', 'atmosphere', 'aesthetic', 'table setting', 'interior']):
+        if any(term in query_lower for term in ['kitchen', 'spring', 'seasonal']):
+            return 'SPRING_KITCHEN_STYLING'
+    
+    # REFRIGERATOR_ORGANIZATION: refrigerator, fridge, organization 관련
+    if any(term in query_lower for term in ['refrigerator', 'fridge', 'organization', 'organize', 'storage', 'organizing']):
+        return 'REFRIGERATOR_ORGANIZATION'
+    
+    # VEGETABLE_PREP_HANDLING: vegetable, prep, wash, store, handling 관련
+    if any(term in query_lower for term in ['vegetable', 'prep', 'wash', 'store', 'handling', 'cleaning', 'fresh']):
+        if any(term in query_lower for term in ['vegetable', 'produce', 'greens']):
+            return 'VEGETABLE_PREP_HANDLING'
+    
+    # 기본값: OTHER
+    return 'OTHER'
 
 
 def generate_channel_summary(lg_count: int, competitor_count: int, earned_count: int, other_count: int) -> str:
@@ -59,10 +92,6 @@ def render_trend_explorer():
     """구글 AI 검색 결과 분석 탭 렌더링"""
     serp_service = get_serp_service()
     
-    # 페이지네이션 상태 관리
-    if 'aio_display_count' not in st.session_state:
-        st.session_state.aio_display_count = 20
-    
     try:
         serp_df = serp_service.get_all_serp_data()
         
@@ -79,157 +108,177 @@ def render_trend_explorer():
             st.info("AVAILABLE 또는 NOT_AVAILABLE 상태의 데이터가 없습니다.")
             return
         
-        col1, col2, col3 = st.columns(3)
+        # 전체 게시물에서 채널 분포 집계
+        total_lg_owned = 0
+        total_competitor = 0
+        total_earned_media = 0
+        total_other = 0
         
-        total_queries = len(filtered_df)
-        available_count = len(filtered_df[filtered_df['aio_status'] == 'AVAILABLE'])
-        not_available_count = len(filtered_df[filtered_df['aio_status'] == 'NOT_AVAILABLE'])
+        for _, row in filtered_df.iterrows():
+            sources = parse_cited_sources(row.get('cited_sources_json'))
+            if sources:
+                for source in sources:
+                    channel_type = source.get('channel_type', 'other')
+                    if channel_type == 'lg_owned':
+                        total_lg_owned += 1
+                    elif channel_type == 'competitor':
+                        total_competitor += 1
+                    elif channel_type == 'earned_media':
+                        total_earned_media += 1
+                    else:
+                        total_other += 1
+        
+        total_sources = total_lg_owned + total_competitor + total_earned_media + total_other
+        
+        # 채널 분포 통계 카드 (4분할 레이아웃)
+        col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            st.metric("Total Queries", total_queries)
+            lg_rate = (total_lg_owned / total_sources * 100) if total_sources > 0 else 0
+            render_insight_card(
+                title="LG Owned",
+                value=f"{total_lg_owned:,}개",
+                description=f"전체의 {lg_rate:.1f}%" if total_sources > 0 else "데이터 없음",
+                color="#2196F3"
+            )
         with col2:
-            st.metric("Available", f"{available_count} ({available_count/total_queries*100:.1f}%)" if total_queries > 0 else "0")
+            competitor_rate = (total_competitor / total_sources * 100) if total_sources > 0 else 0
+            render_insight_card(
+                title="Competitor",
+                value=f"{total_competitor:,}개",
+                description=f"전체의 {competitor_rate:.1f}%" if total_sources > 0 else "데이터 없음",
+                color="#FF9800"
+            )
         with col3:
-            st.metric("Not Available", f"{not_available_count} ({not_available_count/total_queries*100:.1f}%)" if total_queries > 0 else "0")
+            earned_rate = (total_earned_media / total_sources * 100) if total_sources > 0 else 0
+            render_insight_card(
+                title="Earned Media",
+                value=f"{total_earned_media:,}개",
+                description=f"전체의 {earned_rate:.1f}%" if total_sources > 0 else "데이터 없음",
+                color="#4CAF50"
+            )
+        with col4:
+            other_rate = (total_other / total_sources * 100) if total_sources > 0 else 0
+            render_insight_card(
+                title="Other",
+                value=f"{total_other:,}개",
+                description=f"전체의 {other_rate:.1f}%" if total_sources > 0 else "데이터 없음",
+                color="#9E9E9E"
+            )
         
         st.markdown("---")
         
-        # 현재 표시할 항목 수
-        display_count = min(st.session_state.aio_display_count, len(filtered_df))
-        display_df = filtered_df.head(display_count)
+        # 쿼리를 카테고리별로 분류
+        filtered_df['category'] = filtered_df['query'].apply(classify_query_category)
         
-        # 검색 결과 리스트 (번호와 태그 포함)
-        for list_idx, (df_idx, row) in enumerate(display_df.iterrows(), start=1):
-            # 번호와 쿼리 제목
-            expander_title = f"{list_idx}. {row['query']}"
-            if pd.notna(row.get('snapshot_at')):
-                expander_title += f" ({row['snapshot_at']})"
+        # 카테고리별로 그룹화
+        categories = ['SPRING_RECIPES', 'SPRING_KITCHEN_STYLING', 'REFRIGERATOR_ORGANIZATION', 'VEGETABLE_PREP_HANDLING']
+        category_labels = {
+            'SPRING_RECIPES': 'Spring Recipes',
+            'SPRING_KITCHEN_STYLING': 'Spring Kitchen Styling',
+            'REFRIGERATOR_ORGANIZATION': 'Refrigerator Organization',
+            'VEGETABLE_PREP_HANDLING': 'Vegetable Prep & Handling'
+        }
+        
+        # 각 카테고리에 해당하는 데이터만 필터링
+        available_categories = []
+        category_dataframes = {}
+        
+        for cat in categories:
+            cat_df = filtered_df[filtered_df['category'] == cat]
+            if len(cat_df) > 0:
+                available_categories.append(cat)
+                category_dataframes[cat] = cat_df
+        
+        # 탭 생성
+        if available_categories:
+            tab_labels = [category_labels[cat] for cat in available_categories]
+            tabs = st.tabs(tab_labels)
             
-            # 상태 태그와 함께 표시
-            col_tag, col_title = st.columns([1, 9])
-            with col_tag:
-                if row['aio_status'] == 'AVAILABLE':
-                    st.markdown(f"<span style='background-color: #dc3545; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.8em;'>Action required</span>", unsafe_allow_html=True)
-                else:
-                    st.markdown(f"<span style='background-color: #dc3545; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.8em;'>Not Available</span>", unsafe_allow_html=True)
-            with col_title:
-                with st.expander(expander_title):
-                    col1, col2 = st.columns([3, 1])
-                    with col1:
-                        st.markdown(f"**🔍 Query**: `{row['query']}`")
-                    with col2:
-                        if pd.notna(row.get('snapshot_at')):
-                            st.caption(f"📅 {row['snapshot_at']}")
+            for tab, category in zip(tabs, available_categories):
+                with tab:
+                    cat_df = category_dataframes[category]
                     
-                    # AI Overview 텍스트 또는 검색 결과
-                    if row['aio_status'] == 'AVAILABLE' and row.get('aio_text'):
-                        st.markdown("**📄 AI Overview:**")
-                        st.info(row['aio_text'])
-                    elif row.get('source_table') == 'serp_results':
-                        st.markdown("**📄 검색 결과:**")
-                        sources = parse_cited_sources(row.get('cited_sources_json'))
-                        if sources:
-                            st.info(f"총 {len(sources)}개의 검색 결과가 있습니다.")
+                    # 전체 항목 표시 (페이지네이션 제거)
+                    display_df = cat_df
                     
-                    # 참고 URL (채널 분류)
-                    sources = parse_cited_sources(row.get('cited_sources_json'))
-                    if sources:
-                        st.markdown("**🔗 참고 URL:**")
+                    # 검색 결과 리스트
+                    for list_idx, (df_idx, row) in enumerate(display_df.iterrows(), start=1):
+                        # 번호와 쿼리 제목
+                        expander_title = f"{list_idx}. {row['query']}"
                         
-                        # 채널 타입별로 분류
-                        lg_sources = [s for s in sources if s.get('channel_type') == 'lg_owned']
-                        competitor_sources = [s for s in sources if s.get('channel_type') == 'competitor']
-                        earned_sources = [s for s in sources if s.get('channel_type') == 'earned_media']
-                        other_sources = [s for s in sources if s.get('channel_type') == 'other']
-                        
-                        # 채널 분포 통계
-                        st.markdown("**📌 참고 URL 채널 분포**")
-                        col1, col2, col3, col4 = st.columns(4)
-                        with col1:
-                            st.metric("LG Owned", len(lg_sources))
-                        with col2:
-                            st.metric("Competitor", len(competitor_sources))
-                        with col3:
-                            st.metric("Earned Media", len(earned_sources))
-                        with col4:
-                            st.metric("Other", len(other_sources))
-                        
-                        # 카테고리별 expander로 표시
-                        if lg_sources:
-                            with st.expander(f"🏠 LG Owned ({len(lg_sources)})", expanded=False):
-                                for source in lg_sources:
-                                    url = source.get('url', '#')
-                                    title = source.get('title', source.get('domain', 'N/A'))
-                                    snippet = source.get('snippet', '')
-                                    # 새 탭에서 열리도록 HTML 링크 사용
-                                    st.markdown(f"- **<a href='{url}' target='_blank'>{title}</a>** [LG Owned]", unsafe_allow_html=True)
-                                    if snippet:
-                                        st.caption(f"  {snippet[:150]}...")
-                        
-                        if competitor_sources:
-                            with st.expander(f"⚔️ Competitor ({len(competitor_sources)})", expanded=False):
-                                for source in competitor_sources:
-                                    url = source.get('url', '#')
-                                    title = source.get('title', source.get('domain', 'N/A'))
-                                    snippet = source.get('snippet', '')
-                                    st.markdown(f"- **<a href='{url}' target='_blank'>{title}</a>** [Competitor]", unsafe_allow_html=True)
-                                    if snippet:
-                                        st.caption(f"  {snippet[:150]}...")
-                        
-                        if earned_sources:
-                            with st.expander(f"📰 Earned Media ({len(earned_sources)})", expanded=False):
-                                for source in earned_sources:
-                                    url = source.get('url', '#')
-                                    title = source.get('title', source.get('domain', 'N/A'))
-                                    snippet = source.get('snippet', '')
-                                    st.markdown(f"- **<a href='{url}' target='_blank'>{title}</a>** [Earned]", unsafe_allow_html=True)
-                                    if snippet:
-                                        st.caption(f"  {snippet[:150]}...")
-                        
-                        if other_sources:
-                            with st.expander(f"🔗 Other ({len(other_sources)})", expanded=False):
-                                for source in other_sources:
-                                    url = source.get('url', '#')
-                                    title = source.get('title', source.get('domain', 'N/A'))
-                                    snippet = source.get('snippet', '')
-                                    st.markdown(f"- **<a href='{url}' target='_blank'>{title}</a>** [Other]", unsafe_allow_html=True)
-                                    if snippet:
-                                        st.caption(f"  {snippet[:150]}...")
-                        
-                        # 요약 문구 자동 생성
-                        summary_text = generate_channel_summary(
-                            len(lg_sources), 
-                            len(competitor_sources), 
-                            len(earned_sources), 
-                            len(other_sources)
-                        )
-                        if summary_text:
-                            st.info(f"💡 **LG전자 관점 요약**: {summary_text}")
-        
-        # More 버튼 (더 많은 항목 표시)
-        st.markdown("---")
-        if display_count < len(filtered_df):
-            remaining_count = len(filtered_df) - display_count
-            if st.button(f"More ({remaining_count}개 더 보기)", key="aio_more_button"):
-                st.session_state.aio_display_count += 20
-                st.rerun()
+                        with st.expander(expander_title):
+                            st.markdown(f"**탐색어**: `{row['query']}`")
+                            
+                            # AI Overview 텍스트
+                            if row['aio_status'] == 'AVAILABLE' and row.get('aio_text'):
+                                st.markdown("**AI Overview**")
+                                st.caption(row['aio_text'])
+                            
+                            # 참고 URL 채널 분포 및 상세 정보
+                            sources = parse_cited_sources(row.get('cited_sources_json'))
+                            if sources:
+                                # 채널 타입별로 분류
+                                lg_sources = [s for s in sources if s.get('channel_type') == 'lg_owned']
+                                competitor_sources = [s for s in sources if s.get('channel_type') == 'competitor']
+                                earned_sources = [s for s in sources if s.get('channel_type') == 'earned_media']
+                                other_sources = [s for s in sources if s.get('channel_type') == 'other']
+                                
+                                # 채널 분포 통계
+                                st.markdown("**참고 URL 채널 분포**")
+                                col1, col2, col3, col4 = st.columns(4)
+                                with col1:
+                                    st.metric("LG Owned", len(lg_sources))
+                                with col2:
+                                    st.metric("Competitor", len(competitor_sources))
+                                with col3:
+                                    st.metric("Earned Media", len(earned_sources))
+                                with col4:
+                                    st.metric("Other", len(other_sources))
+                                
+                                # 카테고리별 expander로 표시
+                                if lg_sources:
+                                    with st.expander(f"🏠 LG Owned ({len(lg_sources)})", expanded=False):
+                                        for source in lg_sources:
+                                            url = source.get('url', '#')
+                                            title = source.get('title', source.get('domain', 'N/A'))
+                                            snippet = source.get('snippet', '')
+                                            # 새 탭에서 열리도록 HTML 링크 사용
+                                            st.markdown(f"- **<a href='{url}' target='_blank'>{title}</a>** [LG Owned]", unsafe_allow_html=True)
+                                            if snippet:
+                                                st.caption(f"  {snippet[:150]}...")
+                                
+                                if competitor_sources:
+                                    with st.expander(f"⚔️ Competitor ({len(competitor_sources)})", expanded=False):
+                                        for source in competitor_sources:
+                                            url = source.get('url', '#')
+                                            title = source.get('title', source.get('domain', 'N/A'))
+                                            snippet = source.get('snippet', '')
+                                            st.markdown(f"- **<a href='{url}' target='_blank'>{title}</a>** [Competitor]", unsafe_allow_html=True)
+                                            if snippet:
+                                                st.caption(f"  {snippet[:150]}...")
+                                
+                                if earned_sources:
+                                    with st.expander(f"📰 Earned Media ({len(earned_sources)})", expanded=False):
+                                        for source in earned_sources:
+                                            url = source.get('url', '#')
+                                            title = source.get('title', source.get('domain', 'N/A'))
+                                            snippet = source.get('snippet', '')
+                                            st.markdown(f"- **<a href='{url}' target='_blank'>{title}</a>** [Earned]", unsafe_allow_html=True)
+                                            if snippet:
+                                                st.caption(f"  {snippet[:150]}...")
+                                
+                                if other_sources:
+                                    with st.expander(f"🔗 Other ({len(other_sources)})", expanded=False):
+                                        for source in other_sources:
+                                            url = source.get('url', '#')
+                                            title = source.get('title', source.get('domain', 'N/A'))
+                                            snippet = source.get('snippet', '')
+                                            st.markdown(f"- **<a href='{url}' target='_blank'>{title}</a>** [Other]", unsafe_allow_html=True)
+                                            if snippet:
+                                                st.caption(f"  {snippet[:150]}...")
         else:
-            st.info(f"전체 {len(filtered_df)}개 항목을 모두 표시했습니다.")
-            # 리셋 버튼
-            if st.button("처음부터 보기", key="aio_reset_button"):
-                st.session_state.aio_display_count = 20
-                st.rerun()
-        
-        # CSV 다운로드
-        st.markdown("---")
-        csv = filtered_df.to_csv(index=False)
-        st.download_button(
-            "SERP 데이터 다운로드 (CSV)",
-            csv,
-            "serp_aio_data.csv",
-            "text/csv",
-            key="download_serp_csv"
-        )
+            st.info("카테고리별 데이터가 없습니다.")
         
     except Exception as e:
         st.error(f"Error loading trend explorer data: {e}")
