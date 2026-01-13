@@ -16,10 +16,16 @@ from common.file_loader import load_json
 
 def load_keyword_msv_data() -> Optional[Dict]:
     """키워드 MSV JSON 데이터 로드"""
+    from common.path_utils import get_data_dir
+    
     data = load_json("keyword_msv_table.json", required=False)
     
     if data is None:
+        data_dir = get_data_dir()
+        file_path = data_dir / "keyword_msv_table.json"
         st.warning("⚠️ 키워드 MSV 데이터 파일을 찾을 수 없습니다.")
+        st.info(f"💡 파일 경로: `{file_path}`")
+        st.info(f"💡 데이터 디렉토리: `{data_dir}`")
         st.info("💡 `scripts/convert_keyword_table_to_json.py`를 실행하여 데이터를 생성하세요.")
     
     return data
