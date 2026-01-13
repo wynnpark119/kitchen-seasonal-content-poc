@@ -87,6 +87,7 @@ from web.views.keyword_msv_stats import render_keyword_msv_stats
 from web.views.reddit_collection_posts import render_reddit_collection_posts
 from web.views.overview import render_overview
 from web.views.topic_cloud import render_topic_cloud
+from web.views.keyword_trends import render_keyword_trends
 
 # 페이지 설정
 st.set_page_config(
@@ -126,7 +127,8 @@ with st.sidebar:
         ("reddit_analysis", "• Reddit 토픽 분석"),
         ("topic_cloud", "• Topic Cloud"),
         ("ai_overview", "• AI 오버뷰 분석"),
-        ("master_topics", "• 마스터 토픽 제안")
+        ("master_topics", "• 마스터 토픽 제안"),
+        ("keyword_trends", "• 키워드 트렌드")
     ]
     
     # 사이드바 네비게이션 메뉴 스타일 (링크 형태)
@@ -507,3 +509,7 @@ elif selected_page == "ai_overview":
 elif selected_page == "master_topics":
     st.markdown('<div class="page-title">• LG전자 HS 마스터 토픽 제안</div>', unsafe_allow_html=True)
     render_master_topics()
+    
+elif selected_page == "keyword_trends":
+    st.markdown('<div class="page-title">• 키워드 트렌드</div>', unsafe_allow_html=True)
+    render_keyword_trends()
