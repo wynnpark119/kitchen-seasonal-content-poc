@@ -5,6 +5,7 @@ data/
 !data/master_topics_final_kr_en_RICH_WHY.json
 !data/trends_2025.json
 !data/topic_cloud_keywords.json
+!data/reddit_posts_data.json
 # clustering_results.json은 포함 (레딧 수집 현황에서 사용)
 __pycache__/
 *.pyc
